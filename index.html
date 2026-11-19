@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Workshop Room & Fan Airflow Simulation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: #11161d;
+      color: #e6edf3;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Control Panel */
+    .panel {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      width: 310px;
+      max-height: calc(100vh - 28px);
+      overflow-y: auto;
+      background: rgba(17, 23, 31, 0.86);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      z-index: 10;
+    }
+
+    .panel::-webkit-scrollbar {
+      width: 5px;
+    }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: #ffffff;
+    }
+
+    .panel-sub {
+      font-size: 11px;
+      color: #8b9bb0;
+      margin-top: 2px;
+    }
+
+    .section {
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #8da2ba;
+      margin-bottom: 8px;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    button {
+      background: rgba(255, 255, 255, 0.07);
+      color: #dce4ee;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 7px;
+      padding: 7px 8px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    button.active {
+      background: #2563eb;
+      border-color: #60a5fa;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .fan-control {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+    }
+
+    .fan-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .fan-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .dir-pill {
+      padding: 3px 8px;
+      font-size: 10.5px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+
+    .dir-exhaust {
+      background: rgba(239, 68, 68, 0.22);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+
+    .dir-intake {
+      background: rgba(34, 197, 94, 0.22);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #86efac;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+
+    .val-badge {
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      min-width: 36px;
+      text-align: right;
+      color: #b7c6d8;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+      font-size: 12px;
+    }
+
+    .toggle-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      display: inline-block;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      transition: 0.2s;
+    }
+
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+
+    .switch input:checked + .slider-toggle {
+      background: #2563eb;
+    }
+
+    .switch input:checked + .slider-toggle:before {
+      transform: translateX(16px);
+    }
+
+    /* Telemetry & Legend */
+    .hud-right {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .card {
+      background: rgba(17, 23, 31, 0.84);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 10px 14px;
+      min-width: 205px;
+      pointer-events: auto;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .stat-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label {
+      color: #8da2ba;
+    }
+
+    .stat-val {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #f0f6fc;
+    }
+
+    .legend-bar {
+      height: 9px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #1d4ed8 0%, #06b6d4 35%, #22c55e 65%, #f59e0b 85%, #ef4444 100%);
+      margin: 6px 0 4px;
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #9cb0c7;
+    }
+
+    .help-tip {
+      position: fixed;
+      bottom: 12px;
+      right: 14px;
+      background: rgba(17, 23, 31, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-size: 11px;
+      color: #9fb1c6;
+      z-index: 10;
+    }
+
+    #collapse-btn {
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .panel.collapsed .panel-body {
+      display: none;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- Left Control Panel -->
+  <div class="panel" id="control-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">3D Room Airflow Simulator</div>
+        <div class="panel-sub">5.4m × 4.2m × 3.0m Workshop</div>
+      </div>
+      <button id="collapse-btn">Hide</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="section">
+        <div class="section-label">Ventilation Presets</div>
+        <div class="btn-grid">
+          <button id="preset-exhaust" class="active">Both Exhaust</button>
+          <button id="preset-intake">Both Intake</button>
+          <button id="preset-pushpull">Push-Pull Loop</button>
+          <button id="preset-off">Fans Off</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Window Fans (Ø 0.56m)</div>
+        <div class="fan-control">
+          <div class="fan-row">
+            <span class="fan-name">Left Fan</span>
+            <button id="left-dir" class="dir-pill dir-exhaust">EXHAUST (OUT)</button>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="left-speed" min="0" max="100" value="85" />
+            <span class="val-badge" id="left-speed-val">85%</span>
+          </div>
+        </div>
+
+        <div class="fan-control" style="margin-bottom: 0;">
+          <div class="fan-row">
+            <span class="fan-name">Right Fan</span>
+            <button id="right-dir" class="dir-pill dir-exhaust">EXHAUST (OUT)</button>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="right-speed" min="0" max="100" value="85" />
+            <span class="val-badge" id="right-speed-val">85%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Environment & Boundaries</div>
+        <div class="toggle-row">
+          <span>Side Windows Open (Airflow)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-windows" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Radiator Convection Heat</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-radiator" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Cutaway Front Wall & Roof</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-cutaway" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Airflow Visualization</div>
+        <div class="toggle-row">
+          <span>Airflow Stream Trails</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-particles" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>3D Velocity Vector Grid</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-vectors" />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Camera Views</div>
+        <div class="btn-grid">
+          <button id="cam-iso" class="active">3D Cutaway</button>
+          <button id="cam-interior">Interior View</button>
+          <button id="cam-exterior">Exterior Front</button>
+          <button id="cam-plan">Top Floor Plan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Telemetry & Speed Legend -->
+  <div class="hud-right">
+    <div class="card">
+      <div class="section-label" style="margin-bottom: 6px;">Airflow Telemetry</div>
+      <div class="stat-row">
+        <span class="stat-label">Room Volume</span>
+        <span class="stat-val">68.0 m³</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Fan Flow Rate</span>
+        <span class="stat-val" id="stat-flow">0 m³/h</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Air Changes / Hr</span>
+        <span class="stat-val" id="stat-ach">0.0 ACH</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Mean Air Speed</span>
+        <span class="stat-val" id="stat-vel">0.00 m/s</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label" style="margin-bottom: 2px;">Air Velocity (m/s)</div>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span>0.0</span>
+        <span>0.8</span>
+        <span>1.6</span>
+        <span>2.5+</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="help-tip">Drag: Orbit · Right-Drag: Pan · Scroll: Zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/OrbitControls.js";
+
+    // =========================================================================
+    // 1. ROOM DIMENSIONS & SIMULATION STATE
+    // =========================================================================
+    const ROOM_W = 5.4; // X: -2.7 to +2.7
+    const ROOM_H = 3.0; // Y:  0.0 to  3.0
+    const ROOM_D = 4.2; // Z: -2.1 to +2.1 (Back window wall at Z = -ROOM_D/2)
+
+    const state = {
+      leftFan: { speed: 0.85, dir: -1 },  // -1 = Exhaust (out -Z), +1 = Intake (in +Z)
+      rightFan: { speed: 0.85, dir: -1 },
+      windowsOpen: true,
+      radiatorOn: true,
+      cutaway: true,
+      showParticles: true,
+      showVectors: false
+    };
+
+    // =========================================================================
+    // 2. THREE.JS SCENE, CAMERA, RENDERER
+    // =========================================================================
+    const container = document.getElementById("canvas-container");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x161c24);
+    scene.fog = new THREE.Fog(0x161c24, 16, 38);
+
+    const camera = new THREE.PerspectiveCamera(
+      48,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(5.4, 4.4, 5.6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 1.35, -0.2);
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xf3f7ff, 0x3b424d, 0.85);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff8eb, 1.25);
+    sunLight.position.set(-4, 7, -6);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 22;
+    sunLight.shadow.camera.left = -6;
+    sunLight.shadow.camera.right = 6;
+    sunLight.shadow.camera.top = 6;
+    sunLight.shadow.camera.bottom = -6;
+    scene.add(sunLight);
+
+    const ceilingLight = new THREE.PointLight(0xf4f9ff, 1.4, 10, 1.4);
+    ceilingLight.position.set(0, ROOM_H - 0.18, 0);
+    scene.add(ceilingLight);
+
+    // Exterior ground context grid
+    const groundGeo = new THREE.PlaneGeometry(36, 36);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x1b222b,
+      roughness: 0.95
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.02;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const gridHelper = new THREE.GridHelper(24, 24, 0x2f3b4a, 0x222a35);
+    gridHelper.position.y = -0.01;
+    scene.add(gridHelper);
+
+    // =========================================================================
+    // 3. BUILD THE 3D ROOM & PROPS FROM THE REFERENCE IMAGE
+    // =========================================================================
+    const roomGroup = new THREE.Group();
+    scene.add(roomGroup);
+
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: 0xd6d8d4,
+      roughness: 0.85,
+      side: THREE.DoubleSide
+    });
+    const exteriorWallMat = new THREE.MeshStandardMaterial({
+      color: 0xc2c6c0,
+      roughness: 0.9
+    });
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x9aa0a6,
+      roughness: 0.78,
+      metalness: 0.05
+    });
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x2e343b,
+      roughness: 0.45,
+      metalness: 0.35
+    });
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xaad4f5,
+      transparent: true,
+      opacity: 0.24,
+      roughness: 0.08,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    const WALL_T = 0.14;
+
+    // Concrete Floor
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(ROOM_W + WALL_T * 2, 0.12, ROOM_D + WALL_T * 2),
+      floorMat
+    );
+    floor.position.y = -0.06;
+    floor.receiveShadow = true;
+    roomGroup.add(floor);
+
+    // Ceiling & Front Wall (toggled by Cutaway mode)
+    const cutawayGroup = new THREE.Group();
+    roomGroup.add(cutawayGroup);
+
+    const ceiling = new THREE.Mesh(
+      new THREE.BoxGeometry(ROOM_W + WALL_T * 2, 0.12, ROOM_D + WALL_T * 2),
+      wallMat
+    );
+    ceiling.position.y = ROOM_H + 0.06;
+    cutawayGroup.add(ceiling);
+
+    // Ceiling LED strip fixture (from interior photo)
+    const lightFixture = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.05, 0.16),
+      new THREE.MeshBasicMaterial({ color: 0xf8fbff })
+    );
+    lightFixture.position.set(0, ROOM_H - 0.03, -0.35);
+    cutawayGroup.add(lightFixture);
+
+    // Front wall with doorway / vent opening (matches floor plan bottom wall)
+    function buildWallWithOpening(w, h, opening) {
+      // opening: { cx, cy, ow, oh }
+      const group = new THREE.Group();
+      const leftW = opening.cx - opening.ow / 2 + w / 2;
+      const rightW = w / 2 - (opening.cx + opening.ow / 2);
+      const botH = opening.cy - opening.oh / 2;
+      const topH = h - (opening.cy + opening.oh / 2);
+
+      if (leftW > 0.01) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(leftW, h, WALL_T), wallMat);
+        m.position.set(-w / 2 + leftW / 2, h / 2, 0);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      if (rightW > 0.01) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(rightW, h, WALL_T), wallMat);
+        m.position.set(w / 2 - rightW / 2, h / 2, 0);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      if (botH > 0.01) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(opening.ow, botH, WALL_T), wallMat);
+        m.position.set(opening.cx, botH / 2, 0);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      if (topH > 0.01) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(opening.ow, topH, WALL_T), wallMat);
+        m.position.set(opening.cx, h - topH / 2, 0);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      return group;
+    }
+
+    // Front wall (Z = +ROOM_D/2) in cutawayGroup
+    const frontWall = buildWallWithOpening(ROOM_W + WALL_T * 2, ROOM_H, {
+      cx: 0,
+      cy: 1.4,
+      ow: 1.5,
+      oh: 1.4
+    });
+    frontWall.position.z = ROOM_D / 2 + WALL_T / 2;
+    cutawayGroup.add(frontWall);
+
+    // -------------------------------------------------------------------------
+    // BACK WALL WITH LARGE 3x2 WINDOW & TWO FANS (Main Feature Wall, Z = -ROOM_D/2)
+    // -------------------------------------------------------------------------
+    const winW = 3.5;
+    const winH = 2.15;
+    const winSillY = 0.68;
+    const winCenterY = winSillY + winH / 2;
+
+    const backWall = buildWallWithOpening(ROOM_W + WALL_T * 2, ROOM_H, {
+      cx: 0,
+      cy: winCenterY,
+      ow: winW,
+      oh: winH
+    });
+    backWall.position.z = -ROOM_D / 2 - WALL_T / 2;
+    roomGroup.add(backWall);
+
+    // Window Frame Grid: 3 columns (0.68m, 2.14m, 0.68m), 2 rows (bottom 1.47m, top 0.68m)
+    const winGroup = new THREE.Group();
+    winGroup.position.set(0, 0, -ROOM_D / 2 - WALL_T / 2);
+    roomGroup.add(winGroup);
+
+    const frameDepth = WALL_T + 0.04;
+    const barThick = 0.06;
+    const colSideW = 0.68;
+    const colCenterW = winW - colSideW * 2; // 2.14m
+    const rowTopH = 0.68;
+    const rowBotH = winH - rowTopH; // 1.47m
+    const transY = winSillY + rowBotH;
+
+    // Outer perimeter frame
+    function addFrameBar(x, y, z, w, h, d) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), frameMat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      winGroup.add(mesh);
+    }
+
+    // Bottom sill, top header, left jamb, right jamb
+    addFrameBar(0, winSillY + barThick / 2, 0, winW, barThick, frameDepth + 0.04);
+    addFrameBar(0, winSillY + winH - barThick / 2, 0, winW, barThick, frameDepth);
+    addFrameBar(-winW / 2 + barThick / 2, winCenterY, 0, barThick, winH, frameDepth);
+    addFrameBar(winW / 2 - barThick / 2, winCenterY, 0, barThick, winH, frameDepth);
+
+    // Horizontal transom bar separating fans/upper glass from lower windows
+    addFrameBar(0, transY, 0, winW, barThick, frameDepth);
+
+    // Two vertical mullions separating left bay, center bay, right bay
+    const leftMullionX = -winW / 2 + colSideW;
+    const rightMullionX = winW / 2 - colSideW;
+    addFrameBar(leftMullionX, winCenterY, 0, barThick, winH, frameDepth);
+    addFrameBar(rightMullionX, winCenterY, 0, barThick, winH, frameDepth);
+
+    // 4 Glass Panes (lower 3 + upper center)
+    function addGlass(x, y, w, h) {
+      const g = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
+      g.position.set(x, y, 0);
+      winGroup.add(g);
+    }
+    addGlass(-winW / 2 + colSideW / 2, winSillY + rowBotH / 2, colSideW - barThick, rowBotH - barThick);
+    addGlass(0, winSillY + rowBotH / 2, colCenterW - barThick, rowBotH - barThick);
+    addGlass(winW / 2 - colSideW / 2, winSillY + rowBotH / 2, colSideW - barThick, rowBotH - barThick);
+    addGlass(0, transY + rowTopH / 2, colCenterW - barThick, rowTopH - barThick);
+
+    // -------------------------------------------------------------------------
+    // TWO SQUARE VENTILATION FANS (Top-Left & Top-Right bays)
+    // -------------------------------------------------------------------------
+    const fanLeftCenterX = -winW / 2 + colSideW / 2;   // ~ -1.41m
+    const fanRightCenterX = winW / 2 - colSideW / 2;   // ~ +1.41m (2.82m apart -> matches 2.8m label!)
+    const fanCenterY = transY + rowTopH / 2;           // ~ 2.49m
+
+    function createFanUnit(x, y, z) {
+      const fanGroup = new THREE.Group();
+      fanGroup.position.set(x, y, z);
+
+      const boxSize = colSideW - barThick - 0.02;
+      const casingMat = new THREE.MeshStandardMaterial({
+        color: 0xe6eaee,
+        roughness: 0.45,
+        metalness: 0.1
+      });
+      const darkRimMat = new THREE.MeshStandardMaterial({
+        color: 0x363d47,
+        roughness: 0.6
+      });
+
+      // Outer square faceplate & shroud (hollow look using 4 border bars + cylinder ring)
+      const borderT = 0.08;
+      const depth = 0.18;
+      const topB = new THREE.Mesh(new THREE.BoxGeometry(boxSize, borderT, depth), casingMat);
+      topB.position.y = boxSize / 2 - borderT / 2;
+      const botB = topB.clone();
+      botB.position.y = -boxSize / 2 + borderT / 2;
+      const leftB = new THREE.Mesh(new THREE.BoxGeometry(borderT, boxSize - borderT * 2, depth), casingMat);
+      leftB.position.x = -boxSize / 2 + borderT / 2;
+      const rightB = leftB.clone();
+      rightB.position.x = boxSize / 2 - borderT / 2;
+      fanGroup.add(topB, botB, leftB, rightB);
+
+      // Circular throat ring
+      const shroud = new THREE.Mesh(
+        new THREE.TorusGeometry(boxSize * 0.39, 0.032, 12, 32),
+        casingMat
+      );
+      shroud.position.z = 0.06;
+      fanGroup.add(shroud);
+
+      const shroudBack = shroud.clone();
+      shroudBack.position.z = -0.06;
+      fanGroup.add(shroudBack);
+
+      // Rotor assembly (hub + 5 angled impeller blades)
+      const rotor = new THREE.Group();
+      const hub = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.065, 0.065, 0.08, 20),
+        darkRimMat
+      );
+      hub.rotation.x = Math.PI / 2;
+      rotor.add(hub);
+
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0xcfd6de,
+        roughness: 0.35,
+        metalness: 0.25,
+        side: THREE.DoubleSide
+      });
+
+      const bladeCount = 5;
+      for (let i = 0; i < bladeCount; i++) {
+        const bladePivot = new THREE.Group();
+        bladePivot.rotation.z = (i / bladeCount) * Math.PI * 2;
+
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.17, 0.012), bladeMat);
+        blade.position.y = 0.145;
+        blade.rotation.y = 0.42; // pitch angle
+        bladePivot.add(blade);
+        rotor.add(bladePivot);
+      }
+
+      fanGroup.add(rotor);
+      winGroup.add(fanGroup);
+
+      return { group: fanGroup, rotor };
+    }
+
+    const leftFanMesh = createFanUnit(fanLeftCenterX, fanCenterY, 0);
+    const rightFanMesh = createFanUnit(fanRightCenterX, fanCenterY, 0);
+
+    // -------------------------------------------------------------------------
+    // SIDE WALLS WITH CONTROLLABLE WINDOWS (Matches 3D Cutaway & Floor Plan)
+    // -------------------------------------------------------------------------
+    const sideWinOpening = { cx: -0.2, cy: 1.45, ow: 1.8, oh: 1.25 };
+
+    // Left Wall (X = -ROOM_W/2)
+    const leftWall = buildWallWithOpening(ROOM_D, ROOM_H, sideWinOpening);
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.position.x = -ROOM_W / 2 - WALL_T / 2;
+    roomGroup.add(leftWall);
+
+    // Left Window Frame & Hinged Sash (pivots open when windowsOpen = true)
+    const leftWinFrame = new THREE.Group();
+    leftWinFrame.position.set(-ROOM_W / 2 - WALL_T / 2, sideWinOpening.cy, -sideWinOpening.cx);
+    leftWinFrame.rotation.y = Math.PI / 2;
+    roomGroup.add(leftWinFrame);
+
+    // Perimeter frame on left wall window
+    const lwTop = new THREE.Mesh(new THREE.BoxGeometry(sideWinOpening.ow, 0.05, WALL_T + 0.02), frameMat);
+    lwTop.position.y = sideWinOpening.oh / 2 - 0.025;
+    const lwBot = lwTop.clone();
+    lwBot.position.y = -sideWinOpening.oh / 2 + 0.025;
+    const lwL = new THREE.Mesh(new THREE.BoxGeometry(0.05, sideWinOpening.oh, WALL_T + 0.02), frameMat);
+    lwL.position.x = -sideWinOpening.ow / 2 + 0.025;
+    const lwR = lwL.clone();
+    lwR.position.x = sideWinOpening.ow / 2 - 0.025;
+    leftWinFrame.add(lwTop, lwBot, lwL, lwR);
+
+    // Movable sliding/tilting sash on left wall
+    const leftWindowSash = new THREE.Group();
+    leftWindowSash.position.set(0, sideWinOpening.oh / 2 - 0.05, 0); // top-hung awning
+    const sashGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(sideWinOpening.ow - 0.1, sideWinOpening.oh - 0.1),
+      glassMat
+    );
+    sashGlass.position.y = -(sideWinOpening.oh - 0.1) / 2;
+    leftWindowSash.add(sashGlass);
+    leftWinFrame.add(leftWindowSash);
+
+    // Right Wall (X = +ROOM_W/2) with matching window
+    const rightWall = buildWallWithOpening(ROOM_D, ROOM_H, sideWinOpening);
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.position.x = ROOM_W / 2 + WALL_T / 2;
+    roomGroup.add(rightWall);
+
+    const rightWinFrame = new THREE.Group();
+    rightWinFrame.position.set(ROOM_W / 2 + WALL_T / 2, sideWinOpening.cy, sideWinOpening.cx);
+    rightWinFrame.rotation.y = -Math.PI / 2;
+    roomGroup.add(rightWinFrame);
+    rightWinFrame.add(lwTop.clone(), lwBot.clone(), lwL.clone(), lwR.clone());
+
+    const rightWindowSash = new THREE.Group();
+    rightWindowSash.position.set(0, sideWinOpening.oh / 2 - 0.05, 0);
+    rightWindowSash.add(sashGlass.clone());
+    rightWinFrame.add(rightWindowSash);
+
+    // -------------------------------------------------------------------------
+    // INTERIOR WORKSHOP PROPS (Radiator, Workbenches, Cabinet, Paint Cans)
+    // -------------------------------------------------------------------------
+    // White Radiator under back window
+    const radGroup = new THREE.Group();
+    const radMat = new THREE.MeshStandardMaterial({ color: 0xedeff2, roughness: 0.4 });
+    const radBody = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.46, 0.09), radMat);
+    radBody.position.set(0, 0.38, -ROOM_D / 2 + 0.07);
+    radBody.castShadow = true;
+    radGroup.add(radBody);
+    for (let rx = -0.7; rx <= 0.7; rx += 0.07) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.44, 0.1), radMat);
+      fin.position.set(rx, 0.38, -ROOM_D / 2 + 0.075);
+      radGroup.add(fin);
+    }
+    roomGroup.add(radGroup);
+
+    // Wood & steel workbench (Left-Back corner, matching photo)
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0xb99163, roughness: 0.75 });
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0x5c646d, roughness: 0.5, metalness: 0.4 });
+
+    function addBench(x, z, w, d, h) {
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), woodMat);
+      top.position.y = h;
+      top.castShadow = true;
+      top.receiveShadow = true;
+      g.add(top);
+
+      const legGeo = new THREE.BoxGeometry(0.05, h, 0.05);
+      for (const lx of [-w / 2 + 0.05, w / 2 - 0.05]) {
+        for (const lz of [-d / 2 + 0.05, d / 2 - 0.05]) {
+          const leg = new THREE.Mesh(legGeo, steelMat);
+          leg.position.set(lx, h / 2, lz);
+          leg.castShadow = true;
+          g.add(leg);
+        }
+      }
+      g.position.set(x, 0, z);
+      roomGroup.add(g);
+    }
+
+    addBench(-1.75, -1.65, 1.4, 0.62, 0.78);
+    addBench(2.15, -0.4, 0.65, 1.35, 0.75);
+
+    // Paint cans on left bench & right shelves
+    function addCan(x, y, z, colorHex, r = 0.07, h = 0.16) {
+      const can = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r, h, 14),
+        new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4, metalness: 0.3 })
+      );
+      can.position.set(x, y + h / 2, z);
+      can.castShadow = true;
+      roomGroup.add(can);
+    }
+    addCan(-1.9, 0.805, -1.7, 0xd9dee3, 0.08, 0.18);
+    addCan(-1.6, 0.805, -1.55, 0xc84b31, 0.06, 0.14);
+    addCan(-1.45, 0, -1.55, 0xdfe3e6, 0.11, 0.24);
+    addCan(-1.2, 0, -1.65, 0x4b5563, 0.1, 0.22);
+
+    // Tall gray metal cabinet on right wall (matching photo)
+    const cabinet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.6, 1.85, 0.95),
+      new THREE.MeshStandardMaterial({ color: 0x7c848e, roughness: 0.45, metalness: 0.45 })
+    );
+    cabinet.position.set(ROOM_W / 2 - 0.32, 0.925, 0.95);
+    cabinet.castShadow = true;
+    cabinet.receiveShadow = true;
+    roomGroup.add(cabinet);
+
+    // Wall shelves on right wall
+    for (const sy of [1.25, 1.7]) {
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.03, 1.15), woodMat);
+      shelf.position.set(ROOM_W / 2 - 0.14, sy, -0.45);
+      shelf.castShadow = true;
+      roomGroup.add(shelf);
+    }
+    addCan(ROOM_W / 2 - 0.15, 1.715, -0.7, 0xb91c1c, 0.06, 0.14);
+    addCan(ROOM_W / 2 - 0.15, 1.715, -0.4, 0xd1d5db, 0.07, 0.16);
+    addCan(ROOM_W / 2 - 0.15, 1.265, -0.5, 0x2563eb, 0.06, 0.14);
+
+    // =========================================================================
+    // 4. 3D EULERIAN MAC-GRID AIRFLOW SOLVER
+    // =========================================================================
+    const NX = 22;
+    const NY = 12;
+    const NZ = 18;
+    const dx = ROOM_W / NX; // ~0.245m
+    const dy = ROOM_H / NY; // ~0.250m
+    const dz = ROOM_D / NZ; // ~0.233m
+
+    const u = new Float32Array((NX + 1) * NY * NZ);
+    const v = new Float32Array(NX * (NY + 1) * NZ);
+    const w = new Float32Array(NX * NY * (NZ + 1));
+
+    const uTmp = new Float32Array(u.length);
+    const vTmp = new Float32Array(v.length);
+    const wTmp = new Float32Array(w.length);
+
+    const p = new Float32Array(NX * NY * NZ);
+    const div = new Float32Array(NX * NY * NZ);
+
+    const idxU = (i, j, k) => i + (NX + 1) * (j + NY * k);
+    const idxV = (i, j, k) => i + NX * (j + (NY + 1) * k);
+    const idxW = (i, j, k) => i + NX * (j + NY * k);
+    const idxP = (i, j, k) => i + NX * (j + NY * k);
+
+    // Map fan physical coordinates -> grid cells on back wall (k = 0 face)
+    const fan1GridX = (fanLeftCenterX + ROOM_W / 2) / dx;
+    const fan2GridX = (fanRightCenterX + ROOM_W / 2) / dx;
+    const fanGridY = fanCenterY / dy;
+    const fanRadiusCells = 1.45;
+
+    function isFanFace(i, j) {
+      const d1 = Math.hypot(i + 0.5 - fan1GridX, j + 0.5 - fanGridY);
+      if (d1 <= fanRadiusCells) return 1;
+      const d2 = Math.hypot(i + 0.5 - fan2GridX, j + 0.5 - fanGridY);
+      if (d2 <= fanRadiusCells) return 2;
+      return 0;
+    }
+
+    function isSideWindowCell(j, k) {
+      // Side windows span Y ~ 0.85..2.05 (j: 3..8) and Z ~ -0.7..1.1 (k: 6..13)
+      return j >= 3 && j <= 8 && k >= 6 && k <= 13;
+    }
+
+    function isFrontLeakCell(i, j) {
+      // Subtle passive leakage gap at front doorway when windows are closed
+      return i >= 9 && i <= 12 && j === 0;
+    }
+
+    function applyBoundaryConditions() {
+      // 1. Top and bottom walls (v = 0)
+      for (let k = 0; k < NZ; k++) {
+        for (let i = 0; i < NX; i++) {
+          v[idxV(i, 0, k)] = 0;
+          v[idxV(i, NY, k)] = 0;
+        }
+      }
+
+      // 2. Left & Right walls (u = 0 unless open window)
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          if (!state.windowsOpen || !isSideWindowCell(j, k)) {
+            u[idxU(0, j, k)] = 0;
+            u[idxU(NX, j, k)] = 0;
+          }
+        }
+      }
+
+      // 3. Back wall (k = 0: fan faces fixed; rest solid) & Front wall (k = NZ)
+      const maxFanVel = 3.2; // m/s jet face velocity at 100%
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const fanId = isFanFace(i, j);
+          if (fanId === 1) {
+            const vel = state.leftFan.speed * state.leftFan.dir * maxFanVel;
+            w[idxW(i, j, 0)] = vel;
+            // Subtle swirl in cell right in front of an intake fan
+            if (vel > 0.1) {
+              const rx = i + 0.5 - fan1GridX;
+              const ry = j + 0.5 - fanGridY;
+              u[idxU(i, j, 0)] += -ry * 0.25 * vel;
+              v[idxV(i, j, 0)] += rx * 0.25 * vel;
+            }
+          } else if (fanId === 2) {
+            const vel = state.rightFan.speed * state.rightFan.dir * maxFanVel;
+            w[idxW(i, j, 0)] = vel;
+            if (vel > 0.1) {
+              const rx = i + 0.5 - fan2GridX;
+              const ry = j + 0.5 - fanGridY;
+              u[idxU(i, j, 0)] += -ry * 0.25 * vel;
+              v[idxV(i, j, 0)] += rx * 0.25 * vel;
+            }
+          } else {
+            w[idxW(i, j, 0)] = 0;
+          }
+
+          if (!isFrontLeakCell(i, j)) {
+            w[idxW(i, j, NZ)] = 0;
+          }
+        }
+      }
+    }
+
+    function addForces(dt) {
+      // Radiator thermal convection plume under back window
+      if (state.radiatorOn) {
+        for (let i = 7; i <= 14; i++) {
+          for (let j = 1; j <= 4; j++) {
+            for (let k = 0; k <= 1; k++) {
+              v[idxV(i, j, k)] += 0.85 * dt;
+            }
+          }
+        }
+      }
+
+      // Continuous momentum injection near active fans for realistic jet throw
+      const jetReach = 3;
+      const maxFanVel = 3.2;
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const f = isFanFace(i, j);
+          if (f === 1 && state.leftFan.speed > 0.02) {
+            const vel = state.leftFan.speed * state.leftFan.dir * maxFanVel;
+            if (vel > 0) {
+              for (let k = 1; k <= jetReach; k++) {
+                w[idxW(i, j, k)] += (vel - w[idxW(i, j, k)]) * 0.14;
+              }
+            }
+          } else if (f === 2 && state.rightFan.speed > 0.02) {
+            const vel = state.rightFan.speed * state.rightFan.dir * maxFanVel;
+            if (vel > 0) {
+              for (let k = 1; k <= jetReach; k++) {
+                w[idxW(i, j, k)] += (vel - w[idxW(i, j, k)]) * 0.14;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function sampleVelocity(x, y, z) {
+      // x in [0, ROOM_W], y in [0, ROOM_H], z in [0, ROOM_D]
+      const cx = THREE.MathUtils.clamp(x / dx, 0.001, NX - 0.001);
+      const cy = THREE.MathUtils.clamp(y / dy, 0.001, NY - 0.001);
+      const cz = THREE.MathUtils.clamp(z / dz, 0.001, NZ - 0.001);
+
+      // Interpolate U (at i, j+0.5, k+0.5)
+      const ui = Math.min(Math.floor(cx), NX - 1);
+      const uj = THREE.MathUtils.clamp(Math.floor(cy - 0.5), 0, NY - 2);
+      const uk = THREE.MathUtils.clamp(Math.floor(cz - 0.5), 0, NZ - 2);
+      const tx = cx - ui;
+      const ty = THREE.MathUtils.clamp(cy - 0.5 - uj, 0, 1);
+      const tz = THREE.MathUtils.clamp(cz - 0.5 - uk, 0, 1);
+
+      const valU =
+        (1 - tx) * (1 - ty) * (1 - tz) * u[idxU(ui, uj, uk)] +
+        tx * (1 - ty) * (1 - tz) * u[idxU(ui + 1, uj, uk)] +
+        (1 - tx) * ty * (1 - tz) * u[idxU(ui, uj + 1, uk)] +
+        tx * ty * (1 - tz) * u[idxU(ui + 1, uj + 1, uk)] +
+        (1 - tx) * (1 - ty) * tz * u[idxU(ui, uj, uk + 1)] +
+        tx * (1 - ty) * tz * u[idxU(ui + 1, uj, uk + 1)] +
+        (1 - tx) * ty * tz * u[idxU(ui, uj + 1, uk + 1)] +
+        tx * ty * tz * u[idxU(ui + 1, uj + 1, uk + 1)];
+
+      // Interpolate V (at i+0.5, j, k+0.5)
+      const vi = THREE.MathUtils.clamp(Math.floor(cx - 0.5), 0, NX - 2);
+      const vj = Math.min(Math.floor(cy), NY - 1);
+      const vk = THREE.MathUtils.clamp(Math.floor(cz - 0.5), 0, NZ - 2);
+      const vtx = THREE.MathUtils.clamp(cx - 0.5 - vi, 0, 1);
+      const vty = cy - vj;
+      const vtz = THREE.MathUtils.clamp(cz - 0.5 - vk, 0, 1);
+
+      const valV =
+        (1 - vtx) * (1 - vty) * (1 - vtz) * v[idxV(vi, vj, vk)] +
+        vtx * (1 - vty) * (1 - vtz) * v[idxV(vi + 1, vj, vk)] +
+        (1 - vtx) * vty * (1 - vtz) * v[idxV(vi, vj + 1, vk)] +
+        vtx * vty * (1 - vtz) * v[idxV(vi + 1, vj + 1, vk)] +
+        (1 - vtx) * (1 - vty) * vtz * v[idxV(vi, vj, vk + 1)] +
+        vtx * (1 - vty) * vtz * v[idxV(vi + 1, vj, vk + 1)] +
+        (1 - vtx) * vty * vtz * v[idxV(vi, vj + 1, vk + 1)] +
+        vtx * vty * vtz * v[idxV(vi + 1, vj + 1, vk + 1)];
+
+      // Interpolate W (at i+0.5, j+0.5, k)
+      const wi = THREE.MathUtils.clamp(Math.floor(cx - 0.5), 0, NX - 2);
+      const wj = THREE.MathUtils.clamp(Math.floor(cy - 0.5), 0, NY - 2);
+      const wk = Math.min(Math.floor(cz), NZ - 1);
+      const wtx = THREE.MathUtils.clamp(cx - 0.5 - wi, 0, 1);
+      const wty = THREE.MathUtils.clamp(cy - 0.5 - wj, 0, 1);
+      const wtz = cz - wk;
+
+      const valW =
+        (1 - wtx) * (1 - wty) * (1 - wtz) * w[idxW(wi, wj, wk)] +
+        wtx * (1 - wty) * (1 - wtz) * w[idxW(wi + 1, wj, wk)] +
+        (1 - wtx) * wty * (1 - wtz) * w[idxW(wi, wj + 1, wk)] +
+        wtx * wty * (1 - wtz) * w[idxW(wi + 1, wj + 1, wk)] +
+        (1 - wtx) * (1 - wty) * wtz * w[idxW(wi, wj, wk + 1)] +
+        wtx * (1 - wty) * wtz * w[idxW(wi + 1, wj, wk + 1)] +
+        (1 - wtx) * wty * wtz * w[idxW(wi, wj + 1, wk + 1)] +
+        wtx * wty * wtz * w[idxW(wi + 1, wj + 1, wk + 1)];
+
+      return [valU, valV, valW];
+    }
+
+    function advectAndDiffuse(dt) {
+      const damping = 0.992;
+
+      // Advect U
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 0; i <= NX; i++) {
+            const x = i * dx;
+            const y = (j + 0.5) * dy;
+            const z = (k + 0.5) * dz;
+            const [vx, vy, vz] = sampleVelocity(x, y, z);
+            const [bx] = sampleVelocity(x - vx * dt, y - vy * dt, z - vz * dt);
+            uTmp[idxU(i, j, k)] = bx * damping;
+          }
+        }
+      }
+
+      // Advect V
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j <= NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            const x = (i + 0.5) * dx;
+            const y = j * dy;
+            const z = (k + 0.5) * dz;
+            const [vx, vy, vz] = sampleVelocity(x, y, z);
+            const [, by] = sampleVelocity(x - vx * dt, y - vy * dt, z - vz * dt);
+            vTmp[idxV(i, j, k)] = by * damping;
+          }
+        }
+      }
+
+      // Advect W
+      for (let k = 0; k <= NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            const x = (i + 0.5) * dx;
+            const y = (j + 0.5) * dy;
+            const z = k * dz;
+            const [vx, vy, vz] = sampleVelocity(x, y, z);
+            const [, , bz] = sampleVelocity(x - vx * dt, y - vy * dt, z - vz * dt);
+            wTmp[idxW(i, j, k)] = bz * damping;
+          }
+        }
+      }
+
+      u.set(uTmp);
+      v.set(vTmp);
+      w.set(wTmp);
+    }
+
+    function project() {
+      const h = (dx + dy + dz) / 3;
+
+      // Compute divergence at cell centers
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            div[idxP(i, j, k)] =
+              (u[idxU(i + 1, j, k)] - u[idxU(i, j, k)]) / dx +
+              (v[idxV(i, j + 1, k)] - v[idxV(i, j, k)]) / dy +
+              (w[idxW(i, j, k + 1)] - w[idxW(i, j, k)]) / dz;
+          }
+        }
+      }
+
+      // Gauss-Seidel pressure solver (24 iterations)
+      for (let iter = 0; iter < 24; iter++) {
+        for (let k = 0; k < NZ; k++) {
+          for (let j = 0; j < NY; j++) {
+            for (let i = 0; i < NX; i++) {
+              let pSum = 0;
+              let count = 0;
+
+              // Left neighbor / boundary
+              if (i > 0) {
+                pSum += p[idxP(i - 1, j, k)];
+                count++;
+              } else if (state.windowsOpen && isSideWindowCell(j, k)) {
+                // Open window -> ambient p = 0
+                count++;
+              }
+
+              // Right neighbor / boundary
+              if (i < NX - 1) {
+                pSum += p[idxP(i + 1, j, k)];
+                count++;
+              } else if (state.windowsOpen && isSideWindowCell(j, k)) {
+                count++;
+              }
+
+              // Bottom & Top
+              if (j > 0) {
+                pSum += p[idxP(i, j - 1, k)];
+                count++;
+              }
+              if (j < NY - 1) {
+                pSum += p[idxP(i, j + 1, k)];
+                count++;
+              }
+
+              // Back (k=0) & Front (k=NZ-1)
+              if (k > 0) {
+                pSum += p[idxP(i, j, k - 1)];
+                count++;
+              }
+              if (k < NZ - 1) {
+                pSum += p[idxP(i, j, k + 1)];
+                count++;
+              } else if (isFrontLeakCell(i, j)) {
+                count++;
+              }
+
+              if (count > 0) {
+                p[idxP(i, j, k)] = (pSum - div[idxP(i, j, k)] * h * h) / count;
+              }
+            }
+          }
+        }
+      }
+
+      // Subtract pressure gradient from faces
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 1; i < NX; i++) {
+            u[idxU(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i - 1, j, k)]) / dx;
+          }
+          // Open side windows allow pressure-driven flow
+          if (state.windowsOpen && isSideWindowCell(j, k)) {
+            u[idxU(0, j, k)] -= (p[idxP(0, j, k)] - 0) / dx;
+            u[idxU(NX, j, k)] -= (0 - p[idxP(NX - 1, j, k)]) / dx;
+          }
+        }
+      }
+
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 1; j < NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            v[idxV(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j - 1, k)]) / dy;
+          }
+        }
+      }
+
+      for (let k = 1; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            w[idxW(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j, k - 1)]) / dz;
+          }
+        }
+      }
+
+      // Front passive leak faces
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          if (isFrontLeakCell(i, j)) {
+            w[idxW(i, j, NZ)] -= (0 - p[idxP(i, j, NZ - 1)]) / dz;
+          }
+        }
+      }
+    }
+
+    function stepFluid(dt) {
+      applyBoundaryConditions();
+      addForces(dt);
+      advectAndDiffuse(dt);
+      applyBoundaryConditions();
+      project();
+      applyBoundaryConditions();
+    }
+
+    // =========================================================================
+    // 5. AIRFLOW STREAMLINES (GLOWING VELOCITY TRAILS) & VECTOR ARROWS
+    // =========================================================================
+    const PARTICLE_COUNT = 1600;
+    const pPos = new Float32Array(PARTICLE_COUNT * 3); // [0..ROOM_W, 0..ROOM_H, 0..ROOM_D]
+    const pAge = new Float32Array(PARTICLE_COUNT);
+    const pMaxAge = new Float32Array(PARTICLE_COUNT);
+
+    // Each particle renders as a velocity-stretched streak (2 vertices per particle)
+    const streakPositions = new Float32Array(PARTICLE_COUNT * 2 * 3);
+    const streakColors = new Float32Array(PARTICLE_COUNT * 2 * 3);
+
+    const streakGeo = new THREE.BufferGeometry();
+    streakGeo.setAttribute("position", new THREE.BufferAttribute(streakPositions, 3));
+    streakGeo.setAttribute("color", new THREE.BufferAttribute(streakColors, 3));
+
+    const streakMat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const streakMesh = new THREE.LineSegments(streakGeo, streakMat);
+    scene.add(streakMesh);
+
+    function speedToColor(speed, outColor) {
+      const t = THREE.MathUtils.clamp(speed / 2.4, 0, 1);
+      if (t < 0.35) {
+        const s = t / 0.35;
+        outColor.setRGB(0.12 * (1 - s), 0.35 + 0.4 * s, 0.92);
+      } else if (t < 0.65) {
+        const s = (t - 0.35) / 0.3;
+        outColor.setRGB(0.1 + 0.1 * s, 0.75 + 0.12 * s, 0.92 * (1 - s) + 0.35 * s);
+      } else if (t < 0.85) {
+        const s = (t - 0.65) / 0.2;
+        outColor.setRGB(0.2 + 0.75 * s, 0.87 - 0.22 * s, 0.35 * (1 - s));
+      } else {
+        const s = (t - 0.85) / 0.15;
+        outColor.setRGB(0.95, 0.65 - 0.42 * s, 0.12 * (1 - s));
+      }
+    }
+
+    function spawnParticle(idx, randomInit = false) {
+      const r = Math.random();
+      let x, y, z;
+
+      if (randomInit) {
+        x = Math.random() * ROOM_W;
+        y = 0.1 + Math.random() * (ROOM_H - 0.2);
+        z = Math.random() * ROOM_D;
+      } else {
+        // Spawn preferentially at active air inlets so streams look continuous
+        const leftIn = state.leftFan.dir > 0 && state.leftFan.speed > 0.1;
+        const rightIn = state.rightFan.dir > 0 && state.rightFan.speed > 0.1;
+
+        if ((leftIn || rightIn) && r < 0.55) {
+          const useLeft = leftIn && (!rightIn || Math.random() < 0.5);
+          const fx = (useLeft ? fanLeftCenterX : fanRightCenterX) + ROOM_W / 2;
+          const angle = Math.random() * Math.PI * 2;
+          const rad = Math.random() * 0.24;
+          x = fx + Math.cos(angle) * rad;
+          y = fanCenterY + Math.sin(angle) * rad;
+          z = 0.08 + Math.random() * 0.1;
+        } else if (state.windowsOpen && r < 0.72) {
+          // Spawn at left or right open window
+          const isLeft = Math.random() < 0.5;
+          x = isLeft ? 0.06 : ROOM_W - 0.06;
+          y = 0.85 + Math.random() * 1.2;
+          z = 1.45 + Math.random() * 1.65;
+        } else {
+          x = 0.15 + Math.random() * (ROOM_W - 0.3);
+          y = 0.15 + Math.random() * (ROOM_H - 0.3);
+          z = 0.15 + Math.random() * (ROOM_D - 0.3);
+        }
+      }
+
+      pPos[idx * 3] = x;
+      pPos[idx * 3 + 1] = y;
+      pPos[idx * 3 + 2] = z;
+      pAge[idx] = randomInit ? Math.random() * 4 : 0;
+      pMaxAge[idx] = 2.5 + Math.random() * 3.5;
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      spawnParticle(i, true);
+    }
+
+    const tmpColor = new THREE.Color();
+    function updateParticles(dt) {
+      streakMesh.visible = state.showParticles;
+      if (!state.showParticles) return;
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        pAge[i] += dt;
+        let x = pPos[i * 3];
+        let y = pPos[i * 3 + 1];
+        let z = pPos[i * 3 + 2];
+
+        const [vx, vy, vz] = sampleVelocity(x, y, z);
+        const speed = Math.hypot(vx, vy, vz);
+
+        x += vx * dt * 1.15;
+        y += vy * dt * 1.15;
+        z += vz * dt * 1.15;
+
+        // Respawn if aged out or exited bounds
+        if (
+          pAge[i] > pMaxAge[i] ||
+          x < 0.02 || x > ROOM_W - 0.02 ||
+          y < 0.02 || y > ROOM_H - 0.02 ||
+          z < 0.02 || z > ROOM_D - 0.02
+        ) {
+          spawnParticle(i, false);
+          x = pPos[i * 3];
+          y = pPos[i * 3 + 1];
+          z = pPos[i * 3 + 2];
+        } else {
+          pPos[i * 3] = x;
+          pPos[i * 3 + 1] = y;
+          pPos[i * 3 + 2] = z;
+        }
+
+        // Convert to Three.js world coordinates centered on (0, 0, 0)
+        const wx = x - ROOM_W / 2;
+        const wy = y;
+        const wz = z - ROOM_D / 2;
+
+        const tailScale = 0.09 + Math.min(speed * 0.075, 0.24);
+        const inv = speed > 0.001 ? 1 / speed : 0;
+        const tx = wx - vx * inv * tailScale;
+        const ty = wy - vy * inv * tailScale;
+        const tz = wz - vz * inv * tailScale;
+
+        const vIdx = i * 6;
+        streakPositions[vIdx] = tx;
+        streakPositions[vIdx + 1] = ty;
+        streakPositions[vIdx + 2] = tz;
+        streakPositions[vIdx + 3] = wx;
+        streakPositions[vIdx + 4] = wy;
+        streakPositions[vIdx + 5] = wz;
+
+        speedToColor(speed, tmpColor);
+        // Fade tail dimmer than head
+        streakColors[vIdx] = tmpColor.r * 0.25;
+        streakColors[vIdx + 1] = tmpColor.g * 0.25;
+        streakColors[vIdx + 2] = tmpColor.b * 0.25;
+        streakColors[vIdx + 3] = tmpColor.r;
+        streakColors[vIdx + 4] = tmpColor.g;
+        streakColors[vIdx + 5] = tmpColor.b;
+      }
+
+      streakGeo.attributes.position.needsUpdate = true;
+      streakGeo.attributes.color.needsUpdate = true;
+    }
+
+    // 3D Velocity Vector Arrows (InstancedMesh)
+    const vecStepX = 3;
+    const vecStepY = 2;
+    const vecStepZ = 3;
+    const arrowPoints = [];
+    for (let i = 1; i < NX; i += vecStepX) {
+      for (let j = 1; j < NY; j += vecStepY) {
+        for (let k = 1; k < NZ; k += vecStepZ) {
+          arrowPoints.push([
+            (i + 0.5) * dx,
+            (j + 0.5) * dy,
+            (k + 0.5) * dz
+          ]);
+        }
+      }
+    }
+
+    const arrowGeo = new THREE.ConeGeometry(0.04, 0.16, 6);
+    arrowGeo.translate(0, 0.08, 0);
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const arrowInst = new THREE.InstancedMesh(arrowGeo, arrowMat, arrowPoints.length);
+    arrowInst.visible = false;
+    scene.add(arrowInst);
+
+    const dummyObj = new THREE.Object3D();
+    const upVec = new THREE.Vector3(0, 1, 0);
+    const dirVec = new THREE.Vector3();
+
+    function updateVectorArrows() {
+      arrowInst.visible = state.showVectors;
+      if (!state.showVectors) return;
+
+      for (let idx = 0; idx < arrowPoints.length; idx++) {
+        const [x, y, z] = arrowPoints[idx];
+        const [vx, vy, vz] = sampleVelocity(x, y, z);
+        const speed = Math.hypot(vx, vy, vz);
+
+        dummyObj.position.set(x - ROOM_W / 2, y, z - ROOM_D / 2);
+        if (speed > 0.015) {
+          dirVec.set(vx, vy, vz).normalize();
+          dummyObj.quaternion.setFromUnitVectors(upVec, dirVec);
+          const sc = THREE.MathUtils.clamp(0.45 + speed * 0.75, 0.45, 2.2);
+          dummyObj.scale.set(0.8, sc, 0.8);
+        } else {
+          dummyObj.scale.set(0, 0, 0);
+        }
+        dummyObj.updateMatrix();
+        arrowInst.setMatrixAt(idx, dummyObj.matrix);
+
+        speedToColor(speed, tmpColor);
+        arrowInst.setColorAt(idx, tmpColor);
+      }
+
+      arrowInst.instanceMatrix.needsUpdate = true;
+      if (arrowInst.instanceColor) arrowInst.instanceColor.needsUpdate = true;
+    }
+
+    // =========================================================================
+    // 6. UI BINDINGS & CAMERA PRESETS
+    // =========================================================================
+    const elLeftSpeed = document.getElementById("left-speed");
+    const elRightSpeed = document.getElementById("right-speed");
+    const elLeftVal = document.getElementById("left-speed-val");
+    const elRightVal = document.getElementById("right-speed-val");
+    const elLeftDir = document.getElementById("left-dir");
+    const elRightDir = document.getElementById("right-dir");
+
+    function syncUI() {
+      elLeftSpeed.value = Math.round(state.leftFan.speed * 100);
+      elRightSpeed.value = Math.round(state.rightFan.speed * 100);
+      elLeftVal.textContent = `${elLeftSpeed.value}%`;
+      elRightVal.textContent = `${elRightSpeed.value}%`;
+
+      elLeftDir.textContent = state.leftFan.dir < 0 ? "EXHAUST (OUT)" : "INTAKE (IN)";
+      elLeftDir.className = `dir-pill ${state.leftFan.dir < 0 ? "dir-exhaust" : "dir-intake"}`;
+
+      elRightDir.textContent = state.rightFan.dir < 0 ? "EXHAUST (OUT)" : "INTAKE (IN)";
+      elRightDir.className = `dir-pill ${state.rightFan.dir < 0 ? "dir-exhaust" : "dir-intake"}`;
+    }
+
+    const presetButtons = ["preset-exhaust", "preset-intake", "preset-pushpull", "preset-off"];
+    function setActivePreset(activeId) {
+      presetButtons.forEach((id) => {
+        document.getElementById(id).classList.toggle("active", id === activeId);
+      });
+    }
+
+    document.getElementById("preset-exhaust").onclick = () => {
+      state.leftFan = { speed: 0.85, dir: -1 };
+      state.rightFan = { speed: 0.85, dir: -1 };
+      setActivePreset("preset-exhaust");
+      syncUI();
+    };
+    document.getElementById("preset-intake").onclick = () => {
+      state.leftFan = { speed: 0.85, dir: 1 };
+      state.rightFan = { speed: 0.85, dir: 1 };
+      setActivePreset("preset-intake");
+      syncUI();
+    };
+    document.getElementById("preset-pushpull").onclick = () => {
+      state.leftFan = { speed: 0.9, dir: 1 };
+      state.rightFan = { speed: 0.9, dir: -1 };
+      setActivePreset("preset-pushpull");
+      syncUI();
+    };
+    document.getElementById("preset-off").onclick = () => {
+      state.leftFan.speed = 0;
+      state.rightFan.speed = 0;
+      setActivePreset("preset-off");
+      syncUI();
+    };
+
+    elLeftSpeed.oninput = (e) => {
+      state.leftFan.speed = Number(e.target.value) / 100;
+      setActivePreset("");
+      syncUI();
+    };
+    elRightSpeed.oninput = (e) => {
+      state.rightFan.speed = Number(e.target.value) / 100;
+      setActivePreset("");
+      syncUI();
+    };
+    elLeftDir.onclick = () => {
+      state.leftFan.dir *= -1;
+      setActivePreset("");
+      syncUI();
+    };
+    elRightDir.onclick = () => {
+      state.rightFan.dir *= -1;
+      setActivePreset("");
+      syncUI();
+    };
+
+    document.getElementById("toggle-windows").onchange = (e) => {
+      state.windowsOpen = e.target.checked;
+    };
+    document.getElementById("toggle-radiator").onchange = (e) => {
+      state.radiatorOn = e.target.checked;
+    };
+    document.getElementById("toggle-cutaway").onchange = (e) => {
+      state.cutaway = e.target.checked;
+      cutawayGroup.visible = !state.cutaway;
+    };
+    document.getElementById("toggle-particles").onchange = (e) => {
+      state.showParticles = e.target.checked;
+    };
+    document.getElementById("toggle-vectors").onchange = (e) => {
+      state.showVectors = e.target.checked;
+    };
+
+    cutawayGroup.visible = !state.cutaway;
+
+    // Camera Presets
+    const camButtons = ["cam-iso", "cam-interior", "cam-exterior", "cam-plan"];
+    function setCamView(id, pos, target, forceCutaway) {
+      camButtons.forEach((b) => document.getElementById(b).classList.toggle("active", b === id));
+      camera.position.set(...pos);
+      controls.target.set(...target);
+      controls.update();
+
+      if (typeof forceCutaway === "boolean") {
+        state.cutaway = forceCutaway;
+        document.getElementById("toggle-cutaway").checked = forceCutaway;
+        cutawayGroup.visible = !forceCutaway;
+      }
+    }
+
+    document.getElementById("cam-iso").onclick = () =>
+      setCamView("cam-iso", [5.4, 4.4, 5.6], [0, 1.35, -0.2], true);
+
+    document.getElementById("cam-interior").onclick = () =>
+      setCamView("cam-interior", [0, 1.5, 1.85], [0, 1.45, -2.0], false);
+
+    document.getElementById("cam-exterior").onclick = () =>
+      setCamView("cam-exterior", [0, 1.7, -6.5], [0, 1.45, -1.8], false);
+
+    document.getElementById("cam-plan").onclick = () =>
+      setCamView("cam-plan", [0, 7.6, 0.01], [0, 0, 0], true);
+
+    document.getElementById("collapse-btn").onclick = () => {
+      const panel = document.getElementById("control-panel");
+      panel.classList.toggle("collapsed");
+      document.getElementById("collapse-btn").textContent =
+        panel.classList.contains("collapsed") ? "Menu" : "Hide";
+    };
+
+    // =========================================================================
+    // 7. ANIMATION LOOP & TELEMETRY
+    // =========================================================================
+    const elFlow = document.getElementById("stat-flow");
+    const elAch = document.getElementById("stat-ach");
+    const elVel = document.getElementById("stat-vel");
+
+    let lastTime = performance.now();
+    let statsTimer = 0;
+
+    function updateTelemetry() {
+      // Fan swept area ~ 0.246 m², max face speed 3.2 m/s
+      const fanArea = Math.PI * 0.28 * 0.28;
+      const qLeft = state.leftFan.speed * 3.2 * fanArea * 3600;
+      const qRight = state.rightFan.speed * 3.2 * fanArea * 3600;
+      // Efficiency penalty if side windows are closed
+      const restriction = state.windowsOpen ? 1.0 : 0.32;
+      const totalM3h = (qLeft + qRight) * restriction;
+
+      const roomVol = ROOM_W * ROOM_H * ROOM_D; // 68.04 m³
+      const ach = totalM3h / roomVol;
+
+      // Average velocity magnitude in room grid
+      let sumSpeed = 0;
+      let samples = 0;
+      for (let k = 1; k < NZ - 1; k += 2) {
+        for (let j = 1; j < NY - 1; j += 2) {
+          for (let i = 1; i < NX - 1; i += 2) {
+            const vx = 0.5 * (u[idxU(i, j, k)] + u[idxU(i + 1, j, k)]);
+            const vy = 0.5 * (v[idxV(i, j, k)] + v[idxV(i, j + 1, k)]);
+            const vz = 0.5 * (w[idxW(i, j, k)] + w[idxW(i, j, k + 1)]);
+            sumSpeed += Math.hypot(vx, vy, vz);
+            samples++;
+          }
+        }
+      }
+      const meanVel = samples > 0 ? sumSpeed / samples : 0;
+
+      elFlow.textContent = `${Math.round(totalM3h)} m³/h`;
+      elAch.textContent = `${ach.toFixed(1)} ACH`;
+      elVel.textContent = `${meanVel.toFixed(2)} m/s`;
+    }
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((now - lastTime) / 1000, 0.04);
+      lastTime = now;
+
+      // Spin fan blades according to speed & direction
+      leftFanMesh.rotor.rotation.z += state.leftFan.speed * state.leftFan.dir * dt * 26;
+      rightFanMesh.rotor.rotation.z += state.rightFan.speed * state.rightFan.dir * dt * 26;
+
+      // Animate side window tilt open/closed
+      const targetTilt = state.windowsOpen ? 0.45 : 0;
+      leftWindowSash.rotation.x += (targetTilt - leftWindowSash.rotation.x) * 0.12;
+      rightWindowSash.rotation.x += (targetTilt - rightWindowSash.rotation.x) * 0.12;
+
+      // Step 3D Fluid Solver & Particle Advection
+      stepFluid(0.032);
+      updateParticles(dt);
+      updateVectorArrows();
+
+      statsTimer += dt;
+      if (statsTimer > 0.25) {
+        updateTelemetry();
+        statsTimer = 0;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    syncUI();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

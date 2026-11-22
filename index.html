@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>
-    
-  </title>
+  <title>3D Classroom & Exhaust Fan Airflow Simulation</title>
   <style>
     * {
       box-sizing: border-box;
@@ -378,11 +376,11 @@
       </div>
 
       <div class="section">
-        <div class="section-label">Doors, Window & Cutaway</div>
+        <div class="section-label">Door, Window & Cutaway</div>
         <div class="toggle-row">
-          <span>Front Doors Open (Air Intake)</span>
+          <span>Front Door Open (Air Intake)</span>
           <label class="switch">
-            <input type="checkbox" id="toggle-doors" checked />
+            <input type="checkbox" id="toggle-door" checked />
             <span class="slider-toggle"></span>
           </label>
         </div>
@@ -473,15 +471,15 @@
     import { OrbitControls } from "three/addons/OrbitControls.js";
 
     // =========================================================================
-    // 1. MUCH WIDER & LONGER ROOM DIMENSIONS
+    // 1. ROOM DIMENSIONS & STATE
     // =========================================================================
-    const ROOM_W = 10.8; // X: -5.4 to +5.4 (Much wider so the 2 doors are far apart)
+    const ROOM_W = 10.8; // X: -5.4 to +5.4
     const ROOM_H = 3.3;  // Y:  0.0 to  3.3
     const ROOM_D = 12.0; // Z: -6.0 to +6.0
 
     // Orientation:
     // - Back Wall (with 3x2 window & 2 exhaust fans) at Z = -6.0m
-    // - Front Wall (with 2 far-apart doors, ViewBoard & Whiteboard) at Z = +6.0m
+    // - Front Wall (with right-side open door, ViewBoard & Whiteboard) at Z = +6.0m
     // - Facing Front Wall (+Z):
     //     * Left Wall (+X) -> Solid blank wall (NO window)
     //     * Right Wall (-X) -> Huge 70% single-frame window
@@ -489,7 +487,7 @@
     const state = {
       leftFan: { speed: 0.85, dir: -1 },
       rightFan: { speed: 0.85, dir: -1 },
-      doorsOpen: true,
+      doorOpen: true,
       rightWindowOpen: false,
       cutaway: true,
       showParticles: true,
@@ -563,7 +561,7 @@
     scene.add(gridHelper);
 
     // =========================================================================
-    // 3. BUILD THE WIDER EMPTY ROOM, 2 FAR DOORS, SWITCHED BOARDS & WINDOWS
+    // 3. BUILD THE ROOM, RIGHT DOOR ONLY, BOARDS & WINDOWS
     // =========================================================================
     const roomGroup = new THREE.Group();
     scene.add(roomGroup);
@@ -687,16 +685,14 @@
     }
 
     // -------------------------------------------------------------------------
-    // A. FRONT WALL (Z = +6.0m): 2 WIDELY SEPARATED DOORS + SWITCHED BOARDS
+    // A. FRONT WALL (Z = +6.0m): ONLY RIGHT DOOR (Left Door Removed) + BOARDS
     // -------------------------------------------------------------------------
     const doorW = 1.0;
     const doorH = 2.2;
-    const doorLeftX = 4.55;   // Left side when facing front wall (+Z) -> 9.1m apart!
-    const doorRightX = -4.55; // Right side when facing front wall (+Z)
+    const doorRightX = -4.55; // Kept on right side when facing front wall (+Z)
 
     const frontWall = buildWallWithOpenings(ROOM_W + WALL_T * 2, ROOM_H, [
-      { cx: doorRightX, cy: doorH / 2, ow: doorW, oh: doorH },
-      { cx: doorLeftX, cy: doorH / 2, ow: doorW, oh: doorH }
+      { cx: doorRightX, cy: doorH / 2, ow: doorW, oh: doorH }
     ]);
     frontWall.position.z = ROOM_D / 2 + WALL_T / 2;
     roomGroup.add(frontWall);
@@ -737,18 +733,13 @@
       return leafPivot;
     }
 
-    const leftDoorPivot = createDoorAssembly(doorLeftX, +1);
     const rightDoorPivot = createDoorAssembly(doorRightX, -1);
 
-    // Center of Front Wall: SWITCHED positions (ViewBoard on -X, Whiteboard on +X)
-    // Combined pair centered at X = 0:
-    //   ViewBoard (smaller): 1.65m wide x 1.00m high  -> X from -2.365 to -0.715 (center -1.54m)
-    //   Gap:                 0.28m                     -> X from -0.715 to -0.435
-    //   Whiteboard (bigger): 2.80m wide x 1.30m high  -> X from -0.435 to +2.365 (center +0.965m)
+    // Center of Front Wall: ViewBoard (-X) + 0.28m gap + Whiteboard (+X)
     const frontBoardZ = ROOM_D / 2 - 0.025;
     const boardCenterY = 1.55;
 
-    // 1. ViewBoard (switched to -X side, still smaller than Whiteboard)
+    // 1. ViewBoard (smaller)
     const vbW = 1.65;
     const vbH = 1.0;
     const vbX = -2.365 + vbW / 2; // -1.54m
@@ -798,7 +789,7 @@
     vbGroup.add(vbScreen);
     roomGroup.add(vbGroup);
 
-    // 2. Whiteboard (switched to +X side, bigger than ViewBoard, 0.28m gap)
+    // 2. Whiteboard (bigger, 0.28m gap)
     const wbW = 2.8;
     const wbH = 1.3;
     const wbX = 2.365 - wbW / 2; // +0.965m
@@ -827,10 +818,10 @@
     roomGroup.add(wbGroup);
 
     // -------------------------------------------------------------------------
-    // B. BACK WALL (Z = -6.0m): EXPANDED 3x2 WINDOW & 2 EXHAUST FANS
+    // B. BACK WALL (Z = -6.0m): 3x2 WINDOW & 2 EXHAUST FANS
     // -------------------------------------------------------------------------
-    const winW = 7.4; // Scaled proportionally for 10.8m wall (~69%)
-    const winH = 2.4; // Sill 0.70m -> Top 3.10m (0.20m top margin)
+    const winW = 7.4;
+    const winH = 2.4;
     const winSillY = 0.7;
     const winCenterY = winSillY + winH / 2;
 
@@ -847,9 +838,9 @@
     const frameDepth = WALL_T + 0.04;
     const barThick = 0.065;
     const colSideW = 0.95;
-    const colCenterW = winW - colSideW * 2; // 5.50m
+    const colCenterW = winW - colSideW * 2;
     const rowTopH = 0.95;
-    const rowBotH = winH - rowTopH; // 1.45m
+    const rowBotH = winH - rowTopH;
     const transY = winSillY + rowBotH;
 
     function addBackFrameBar(x, y, z, w, h, d) {
@@ -958,12 +949,12 @@
     const rightFanMesh = createFanUnit(fanRightCenterX, fanCenterY, 0);
 
     // -------------------------------------------------------------------------
-    // C. SIDE WALLS (Relative to facing the Front Wall)
-    //    - Left Wall (+X): SOLID WALL (No Window)
-    //    - Right Wall (-X): 70% WIDE, SINGLE-FRAME WINDOW, SMALL TOP MARGIN
+    // C. SIDE WALLS
+    //    - Left Wall (+X): Solid blank wall (no window)
+    //    - Right Wall (-X): 70% single-frame window
     // -------------------------------------------------------------------------
-    const rightWinW = ROOM_D * 0.70; // 8.40m (70% of 12.0m wall)
-    const rightWinH = 2.25;          // 0.85m sill -> 3.10m top (0.20m top margin)
+    const rightWinW = ROOM_D * 0.70; // 8.40m
+    const rightWinH = 2.25;
     const rightWinSillY = 0.85;
     const rightWinCenterY = rightWinSillY + rightWinH / 2;
 
@@ -974,7 +965,6 @@
     rightWall.position.x = -ROOM_W / 2 - WALL_T / 2;
     roomGroup.add(rightWall);
 
-    // 1 single outer frame ONLY
     const rightWinGroup = new THREE.Group();
     rightWinGroup.position.set(-ROOM_W / 2 - WALL_T / 2, rightWinCenterY, 0);
     rightWinGroup.rotation.y = Math.PI / 2;
@@ -1001,7 +991,6 @@
     rightWindowSash.add(rwGlass);
     rightWinGroup.add(rightWindowSash);
 
-    // Solid Blank Left Wall (+X)
     const blankLeftWallMesh = new THREE.Mesh(
       new THREE.BoxGeometry(ROOM_D, ROOM_H, WALL_T),
       wallMat
@@ -1058,19 +1047,17 @@
       return 0;
     }
 
-    // Right wall (-X -> i = 0): 70% wide single-frame window (Z: -4.2 to +4.2 -> k: 6..33, Y: 0.85..3.10 -> j: 3..9)
     function isRightWindowCell(j, k) {
       return j >= 3 && j <= 9 && k >= 6 && k <= 33;
     }
 
-    // Front wall (k = NZ): Two widely separated open doors
-    // Door Right (-4.55m -> x: 0.35..1.35 -> i: 1..4), Door Left (+4.55m -> x: 9.45..10.45 -> i: 31..34)
+    // Only the Right-side Front Door remains (-4.55m -> x: 0.35..1.35 -> i: 1..4)
     function isFrontDoorCell(i, j) {
-      return j <= 6 && ((i >= 1 && i <= 4) || (i >= 31 && i <= 34));
+      return j <= 6 && i >= 1 && i <= 4;
     }
 
     function isPassiveLeak(i, j) {
-      return j === 0 && (i === 2 || i === 33);
+      return j === 0 && i >= 1 && i <= 4;
     }
 
     function applyBoundaryConditions() {
@@ -1116,8 +1103,8 @@
             w[idxW(i, j, 0)] = 0;
           }
 
-          const doorOpen = state.doorsOpen && isFrontDoorCell(i, j);
-          const leakOpen = !state.doorsOpen && !state.rightWindowOpen && isPassiveLeak(i, j);
+          const doorOpen = state.doorOpen && isFrontDoorCell(i, j);
+          const leakOpen = !state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j);
           if (!doorOpen && !leakOpen) {
             w[idxW(i, j, NZ)] = 0;
           }
@@ -1155,7 +1142,6 @@
       const cy = THREE.MathUtils.clamp(y / dy, 0.001, NY - 0.001);
       const cz = THREE.MathUtils.clamp(z / dz, 0.001, NZ - 0.001);
 
-      // U
       const ui = Math.min(Math.floor(cx), NX - 1);
       const uj = THREE.MathUtils.clamp(Math.floor(cy - 0.5), 0, NY - 2);
       const uk = THREE.MathUtils.clamp(Math.floor(cz - 0.5), 0, NZ - 2);
@@ -1173,7 +1159,6 @@
         (1 - tx) * ty * tz * u[idxU(ui, uj + 1, uk + 1)] +
         tx * ty * tz * u[idxU(ui + 1, uj + 1, uk + 1)];
 
-      // V
       const vi = THREE.MathUtils.clamp(Math.floor(cx - 0.5), 0, NX - 2);
       const vj = Math.min(Math.floor(cy), NY - 1);
       const vk = THREE.MathUtils.clamp(Math.floor(cz - 0.5), 0, NZ - 2);
@@ -1191,7 +1176,6 @@
         (1 - vtx) * vty * vtz * v[idxV(vi, vj + 1, vk + 1)] +
         vtx * vty * vtz * v[idxV(vi + 1, vj + 1, vk + 1)];
 
-      // W
       const wi = THREE.MathUtils.clamp(Math.floor(cx - 0.5), 0, NX - 2);
       const wj = THREE.MathUtils.clamp(Math.floor(cy - 0.5), 0, NY - 2);
       const wk = Math.min(Math.floor(cz), NZ - 1);
@@ -1309,8 +1293,8 @@
                 pSum += p[idxP(i, j, k + 1)];
                 count++;
               } else if (
-                (state.doorsOpen && isFrontDoorCell(i, j)) ||
-                (!state.doorsOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
+                (state.doorOpen && isFrontDoorCell(i, j)) ||
+                (!state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
               ) {
                 count++;
               }
@@ -1353,8 +1337,8 @@
       for (let j = 0; j < NY; j++) {
         for (let i = 0; i < NX; i++) {
           if (
-            (state.doorsOpen && isFrontDoorCell(i, j)) ||
-            (!state.doorsOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
+            (state.doorOpen && isFrontDoorCell(i, j)) ||
+            (!state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
           ) {
             w[idxW(i, j, NZ)] -= (0 - p[idxP(i, j, NZ - 1)]) / dz;
           }
@@ -1433,10 +1417,8 @@
           x = fx + Math.cos(angle) * rad;
           y = fanCenterY + Math.sin(angle) * rad;
           z = 0.08 + Math.random() * 0.12;
-        } else if (state.doorsOpen && r < 0.75) {
-          const useDoorLeft = Math.random() < 0.5;
-          const doorWorldX = useDoorLeft ? doorLeftX : doorRightX;
-          x = doorWorldX + ROOM_W / 2 + (Math.random() - 0.5) * 0.85;
+        } else if (state.doorOpen && r < 0.75) {
+          x = doorRightX + ROOM_W / 2 + (Math.random() - 0.5) * 0.85;
           y = 0.15 + Math.random() * 1.95;
           z = ROOM_D - 0.08 - Math.random() * 0.12;
         } else if (state.rightWindowOpen && r < 0.88) {
@@ -1656,8 +1638,8 @@
       syncUI();
     };
 
-    document.getElementById("toggle-doors").onchange = (e) => {
-      state.doorsOpen = e.target.checked;
+    document.getElementById("toggle-door").onchange = (e) => {
+      state.doorOpen = e.target.checked;
     };
     document.getElementById("toggle-right-window").onchange = (e) => {
       state.rightWindowOpen = e.target.checked;
@@ -1718,11 +1700,11 @@
     let statsTimer = 0;
 
     function updateTelemetry() {
-      const fanArea = Math.PI * 0.41 * 0.41; // Swept area for wider 0.82m fan
+      const fanArea = Math.PI * 0.41 * 0.41;
       const qLeft = state.leftFan.speed * 4.2 * fanArea * 3600;
       const qRight = state.rightFan.speed * 4.2 * fanArea * 3600;
 
-      const hasIntake = state.doorsOpen || state.rightWindowOpen;
+      const hasIntake = state.doorOpen || state.rightWindowOpen;
       const restriction = hasIntake ? 1.0 : 0.14;
       const totalM3h = (qLeft + qRight) * restriction;
 
@@ -1757,9 +1739,7 @@
       leftFanMesh.rotor.rotation.z += state.leftFan.speed * state.leftFan.dir * dt * 26;
       rightFanMesh.rotor.rotation.z += state.rightFan.speed * state.rightFan.dir * dt * 26;
 
-      const targetLeftDoorAngle = state.doorsOpen ? -1.35 : 0;
-      const targetRightDoorAngle = state.doorsOpen ? 1.35 : 0;
-      leftDoorPivot.rotation.y += (targetLeftDoorAngle - leftDoorPivot.rotation.y) * 0.14;
+      const targetRightDoorAngle = state.doorOpen ? 1.35 : 0;
       rightDoorPivot.rotation.y += (targetRightDoorAngle - rightDoorPivot.rotation.y) * 0.14;
 
       const targetWinTilt = state.rightWindowOpen ? 0.35 : 0;

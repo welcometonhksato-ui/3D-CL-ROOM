@@ -561,8 +561,211 @@
     scene.add(gridHelper);
 
     // =========================================================================
-    // 3. BUILD THE ROOM, RIGHT DOOR ONLY, BOARDS & WINDOWS
+    // 3. BUILD THE ROOM, RIGHT DOOR ONLY, BOARDS, APPLE BOX, TREE & WINDOWS
     // =========================================================================
+    function mulberry32(seed) {
+      let a = seed;
+      return function () {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function createHardwoodFloorTextures(repeatX, repeatY) {
+      const size = 1024;
+      const cCanvas = document.createElement("canvas");
+      cCanvas.width = size;
+      cCanvas.height = size;
+      const ctx = cCanvas.getContext("2d");
+
+      const bCanvas = document.createElement("canvas");
+      bCanvas.width = size;
+      bCanvas.height = size;
+      const bctx = bCanvas.getContext("2d");
+
+      const rCanvas = document.createElement("canvas");
+      rCanvas.width = size;
+      rCanvas.height = size;
+      const rctx = rCanvas.getContext("2d");
+
+      const rand = mulberry32(8842);
+
+      // Rich warm honey-amber / teak / chestnut hardwood palette matching reference photo
+      const plankPalette = [
+        [204, 131, 63],  // warm golden honey
+        [192, 118, 52],  // medium amber teak
+        [214, 144, 74],  // bright warm oak
+        [168, 94, 41],   // rich warm chestnut
+        [140, 74, 34],   // deeper reddish-brown plank
+        [198, 126, 58]   // satin honey brown
+      ];
+
+      const rows = 8;
+      const rowH = size / rows; // exact 128px
+      const rowOffsets = [0.08, 0.56, 0.24, 0.78, 0.41, 0.89, 0.16, 0.65];
+
+      bctx.fillStyle = "#888888";
+      bctx.fillRect(0, 0, size, size);
+      rctx.fillStyle = "#707070";
+      rctx.fillRect(0, 0, size, size);
+
+      function drawSinglePlank(px, py, pw, ph, baseRgb, plankSeed) {
+        const pr = mulberry32(plankSeed);
+
+        const drawSegment = (sx, sw) => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(sx, py, sw, ph);
+          ctx.clip();
+
+          // Subtle gradient along plank width & length
+          const g = ctx.createLinearGradient(sx, py, sx + sw, py + ph);
+          const v1 = (pr() - 0.5) * 14;
+          const v2 = (pr() - 0.5) * 14;
+          g.addColorStop(
+            0,
+            `rgb(${Math.round(baseRgb[0] + v1)}, ${Math.round(baseRgb[1] + v1 * 0.7)}, ${Math.round(baseRgb[2] + v1 * 0.45)})`
+          );
+          g.addColorStop(
+            1,
+            `rgb(${Math.round(baseRgb[0] + v2)}, ${Math.round(baseRgb[1] + v2 * 0.7)}, ${Math.round(baseRgb[2] + v2 * 0.45)})`
+          );
+          ctx.fillStyle = g;
+          ctx.fillRect(sx, py, sw, ph);
+
+          // Fine longitudinal wood grain fibers
+          for (let i = 0; i < 95; i++) {
+            const gy = py + pr() * ph;
+            const waveAmp = 1.5 + pr() * 4.5;
+            const waveFreq = (1 + Math.floor(pr() * 3)) * Math.PI * 2;
+            const dark = pr() < 0.62;
+            ctx.strokeStyle = dark
+              ? `rgba(82, 36, 12, ${0.10 + pr() * 0.18})`
+              : `rgba(242, 185, 114, ${0.08 + pr() * 0.14})`;
+            ctx.lineWidth = 0.7 + pr() * 2.2;
+            ctx.beginPath();
+            for (let step = 0; step <= 16; step++) {
+              const t = step / 16;
+              const wx = sx + t * sw;
+              const wy = gy + Math.sin(t * waveFreq + i) * waveAmp;
+              if (step === 0) ctx.moveTo(wx, wy);
+              else ctx.lineTo(wx, wy);
+            }
+            ctx.stroke();
+          }
+
+          // Subtle darker heartwood cathedral streaks on some planks
+          if (pr() < 0.55) {
+            const cy = py + ph * (0.3 + pr() * 0.4);
+            for (let b = 0; b < 5; b++) {
+              ctx.strokeStyle = `rgba(98, 42, 15, ${0.11 + pr() * 0.12})`;
+              ctx.lineWidth = 2.0 + pr() * 3.5;
+              ctx.beginPath();
+              ctx.moveTo(sx, cy + (b - 2) * 5);
+              ctx.bezierCurveTo(
+                sx + sw * 0.35,
+                cy + (b - 2) * 10,
+                sx + sw * 0.65,
+                cy + (b - 2) * 8,
+                sx + sw,
+                cy + (b - 2) * 4
+              );
+              ctx.stroke();
+            }
+          }
+
+          // Roughness & bump variation per plank
+          const rVal = 96 + Math.round(pr() * 28);
+          rctx.fillStyle = `rgb(${rVal}, ${rVal}, ${rVal})`;
+          rctx.fillRect(sx, py, sw, ph);
+
+          bctx.fillStyle = `rgb(${128 + Math.round((pr() - 0.5) * 16)}, ${128 + Math.round((pr() - 0.5) * 16)}, ${128 + Math.round((pr() - 0.5) * 16)})`;
+          bctx.fillRect(sx, py, sw, ph);
+          for (let i = 0; i < 40; i++) {
+            const gy = py + pr() * ph;
+            bctx.strokeStyle = pr() < 0.5 ? "rgba(95,95,95,0.28)" : "rgba(165,165,165,0.22)";
+            bctx.lineWidth = 1.0 + pr() * 1.4;
+            bctx.beginPath();
+            bctx.moveTo(sx, gy);
+            bctx.lineTo(sx + sw, gy);
+            bctx.stroke();
+          }
+
+          ctx.restore();
+        };
+
+        // Draw primary segment + wrapped segment(s) for seamless horizontal tiling
+        drawSegment(px, pw);
+        if (px + pw > size) drawSegment(px - size, pw);
+        if (px < 0) drawSegment(px + size, pw);
+
+        // Butt-joint vertical bevel seam (wrapped cleanly)
+        const drawButtSeam = (jx) => {
+          const xNorm = ((jx % size) + size) % size;
+          ctx.fillStyle = "rgba(62, 27, 10, 0.72)";
+          ctx.fillRect(xNorm - 1, py, 2, ph);
+          ctx.fillStyle = "rgba(245, 194, 128, 0.18)";
+          ctx.fillRect(xNorm + 1, py, 1.5, ph);
+
+          bctx.fillStyle = "rgb(45, 45, 45)";
+          bctx.fillRect(xNorm - 1.5, py, 3, ph);
+          rctx.fillStyle = "rgb(215, 215, 215)";
+          rctx.fillRect(xNorm - 1.5, py, 3, ph);
+        };
+        drawButtSeam(px);
+      }
+
+      for (let r = 0; r < rows; r++) {
+        const py = r * rowH;
+        const offset = rowOffsets[r] * size;
+        const p1Frac = 0.42 + rand() * 0.16;
+        const p1W = Math.round(size * p1Frac);
+        const p2W = size - p1W;
+
+        const c1 = plankPalette[Math.floor(rand() * plankPalette.length)];
+        let c2 = plankPalette[Math.floor(rand() * plankPalette.length)];
+        if (c2 === c1) c2 = plankPalette[(plankPalette.indexOf(c1) + 2) % plankPalette.length];
+
+        drawSinglePlank(offset, py, p1W, rowH, c1, 1000 + r * 31 + 1);
+        drawSinglePlank(offset + p1W, py, p2W, rowH, c2, 1000 + r * 31 + 2);
+
+        // Horizontal plank row bevel seam
+        ctx.fillStyle = "rgba(58, 25, 9, 0.74)";
+        ctx.fillRect(0, py, size, 2);
+        ctx.fillStyle = "rgba(245, 195, 130, 0.16)";
+        ctx.fillRect(0, py + 2, size, 1.5);
+
+        bctx.fillStyle = "rgb(40, 40, 40)";
+        bctx.fillRect(0, py, size, 2.5);
+        rctx.fillStyle = "rgb(215, 215, 215)";
+        rctx.fillRect(0, py, size, 2.5);
+      }
+
+      const map = new THREE.CanvasTexture(cCanvas);
+      map.wrapS = THREE.RepeatWrapping;
+      map.wrapT = THREE.RepeatWrapping;
+      map.repeat.set(repeatX, repeatY);
+      map.anisotropy = 8;
+      map.colorSpace = THREE.SRGBColorSpace;
+
+      const bumpMap = new THREE.CanvasTexture(bCanvas);
+      bumpMap.wrapS = THREE.RepeatWrapping;
+      bumpMap.wrapT = THREE.RepeatWrapping;
+      bumpMap.repeat.set(repeatX, repeatY);
+      bumpMap.anisotropy = 8;
+
+      const roughnessMap = new THREE.CanvasTexture(rCanvas);
+      roughnessMap.wrapS = THREE.RepeatWrapping;
+      roughnessMap.wrapT = THREE.RepeatWrapping;
+      roughnessMap.repeat.set(repeatX, repeatY);
+      roughnessMap.anisotropy = 8;
+
+      return { map, bumpMap, roughnessMap };
+    }
+
     const roomGroup = new THREE.Group();
     scene.add(roomGroup);
 
@@ -579,10 +782,19 @@
       depthWrite: false,
       side: THREE.DoubleSide
     });
+
+    const WALL_T = 0.16;
+    const floorW = ROOM_W + WALL_T * 2;
+    const floorD = ROOM_D + WALL_T * 2;
+    const floorTex = createHardwoodFloorTextures(floorW / 1.6, floorD / 1.6);
+
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x9aa0a6,
-      roughness: 0.78,
-      metalness: 0.05
+      map: floorTex.map,
+      bumpMap: floorTex.bumpMap,
+      bumpScale: 0.008,
+      roughnessMap: floorTex.roughnessMap,
+      roughness: 0.48,
+      metalness: 0.04
     });
     const frameMat = new THREE.MeshStandardMaterial({
       color: 0x2e343b,
@@ -599,11 +811,9 @@
       depthWrite: false
     });
 
-    const WALL_T = 0.16;
-
-    // Concrete Floor
+    // Hardwood Plank Floor
     const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(ROOM_W + WALL_T * 2, 0.14, ROOM_D + WALL_T * 2),
+      new THREE.BoxGeometry(floorW, 0.14, floorD),
       floorMat
     );
     floor.position.y = -0.07;
@@ -817,6 +1027,574 @@
     wbGroup.add(wbTray);
     roomGroup.add(wbGroup);
 
+    // 3. Solid Black Wooden Apple Box (centered on front wall, spanning ViewBoard + gap + Whiteboard)
+    const boardsMinX = vbX - vbW / 2; // -2.365m
+    const boardsMaxX = wbX + wbW / 2; // +2.365m
+    const appleBoxW = boardsMaxX - boardsMinX; // 4.73m
+    const appleBoxH = 0.45; // 45cm tall solid rectangular box
+    const appleBoxD = 0.90; // 90cm deep from front wall into room
+    const appleBoxCenterX = (boardsMinX + boardsMaxX) / 2; // 0.0m
+
+    function createBlackWoodCanvases() {
+      const w = 1024;
+      const h = 512;
+
+      const colorCanvas = document.createElement("canvas");
+      colorCanvas.width = w;
+      colorCanvas.height = h;
+      const cctx = colorCanvas.getContext("2d");
+
+      const bumpCanvas = document.createElement("canvas");
+      bumpCanvas.width = w;
+      bumpCanvas.height = h;
+      const bctx = bumpCanvas.getContext("2d");
+
+      cctx.fillStyle = "#17181b";
+      cctx.fillRect(0, 0, w, h);
+
+      bctx.fillStyle = "#808080";
+      bctx.fillRect(0, 0, w, h);
+
+      const plankCount = 4;
+      const plankH = h / plankCount;
+      for (let p = 0; p < plankCount; p++) {
+        const y0 = p * plankH;
+        const shade = 20 + (p % 2) * 4;
+        cctx.fillStyle = `rgb(${shade}, ${shade + 1}, ${shade + 3})`;
+        cctx.fillRect(0, y0, w, plankH);
+
+        for (let i = 0; i < 420; i++) {
+          const gy = y0 + Math.random() * plankH;
+          const gx = Math.random() * w;
+          const glen = 60 + Math.random() * 240;
+          const gthick = 0.8 + Math.random() * 2.0;
+          const dark = Math.random() < 0.6;
+
+          cctx.strokeStyle = dark
+            ? `rgba(7, 8, 10, ${0.22 + Math.random() * 0.35})`
+            : `rgba(46, 48, 54, ${0.14 + Math.random() * 0.22})`;
+          cctx.lineWidth = gthick;
+          cctx.beginPath();
+          cctx.moveTo(gx, gy);
+          cctx.bezierCurveTo(
+            gx + glen * 0.33,
+            gy + (Math.random() - 0.5) * 4,
+            gx + glen * 0.66,
+            gy + (Math.random() - 0.5) * 4,
+            gx + glen,
+            gy + (Math.random() - 0.5) * 2
+          );
+          cctx.stroke();
+
+          bctx.strokeStyle = dark
+            ? `rgba(40, 40, 40, ${0.25 + Math.random() * 0.35})`
+            : `rgba(195, 195, 195, ${0.15 + Math.random() * 0.2})`;
+          bctx.lineWidth = gthick;
+          bctx.beginPath();
+          bctx.moveTo(gx, gy);
+          bctx.lineTo(gx + glen, gy);
+          bctx.stroke();
+        }
+
+        cctx.fillStyle = "rgba(5, 5, 7, 0.55)";
+        cctx.fillRect(0, y0, w, 2);
+        bctx.fillStyle = "rgb(20, 20, 20)";
+        bctx.fillRect(0, y0, w, 2);
+      }
+
+      return { colorCanvas, bumpCanvas };
+    }
+
+    const { colorCanvas: woodColorCanvas, bumpCanvas: woodBumpCanvas } = createBlackWoodCanvases();
+
+    function makeWoodFaceMaterial(repeatX, repeatY) {
+      const map = new THREE.CanvasTexture(woodColorCanvas);
+      map.wrapS = THREE.RepeatWrapping;
+      map.wrapT = THREE.RepeatWrapping;
+      map.repeat.set(repeatX, repeatY);
+      map.colorSpace = THREE.SRGBColorSpace;
+
+      const bumpMap = new THREE.CanvasTexture(woodBumpCanvas);
+      bumpMap.wrapS = THREE.RepeatWrapping;
+      bumpMap.wrapT = THREE.RepeatWrapping;
+      bumpMap.repeat.set(repeatX, repeatY);
+
+      return new THREE.MeshStandardMaterial({
+        map,
+        bumpMap,
+        bumpScale: 0.014,
+        roughness: 0.72,
+        metalness: 0.05
+      });
+    }
+
+    const appleBoxMaterials = [
+      makeWoodFaceMaterial(appleBoxD / 1.8, appleBoxH / 0.6),
+      makeWoodFaceMaterial(appleBoxD / 1.8, appleBoxH / 0.6),
+      makeWoodFaceMaterial(appleBoxW / 1.8, appleBoxD / 0.6),
+      makeWoodFaceMaterial(appleBoxW / 1.8, appleBoxD / 0.6),
+      makeWoodFaceMaterial(appleBoxW / 1.8, appleBoxH / 0.6),
+      makeWoodFaceMaterial(appleBoxW / 1.8, appleBoxH / 0.6)
+    ];
+
+    const appleBoxMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(appleBoxW, appleBoxH, appleBoxD),
+      appleBoxMaterials
+    );
+    appleBoxMesh.position.set(
+      appleBoxCenterX,
+      appleBoxH / 2,
+      ROOM_D / 2 - appleBoxD / 2
+    );
+    appleBoxMesh.castShadow = true;
+    appleBoxMesh.receiveShadow = true;
+    roomGroup.add(appleBoxMesh);
+
+    // -------------------------------------------------------------------------
+    // 4. TALL CHRISTMAS TREE IN FRONT-LEFT CORNER (+X, +Z) NEAR CEILING
+    // -------------------------------------------------------------------------
+    const treeX = ROOM_W / 2 - 1.12; // +4.28m (outer needle tips clear of blank left wall +5.4m)
+    const treeZ = ROOM_D / 2 - 1.12; // +4.88m (outer needle tips clear of front wall +6.0m)
+    const treeConeH = 2.52;          // Tall body so star topper reaches 3.10m (20cm below 3.30m ceiling)
+    const treeBaseR = 0.90;
+
+    function createPineCoreTextures() {
+      const w = 512;
+      const h = 512;
+      const cCanvas = document.createElement("canvas");
+      cCanvas.width = w;
+      cCanvas.height = h;
+      const ctx = cCanvas.getContext("2d");
+
+      const bCanvas = document.createElement("canvas");
+      bCanvas.width = w;
+      bCanvas.height = h;
+      const bctx = bCanvas.getContext("2d");
+
+      ctx.fillStyle = "#061e0c";
+      ctx.fillRect(0, 0, w, h);
+      bctx.fillStyle = "#555555";
+      bctx.fillRect(0, 0, w, h);
+
+      const rand = mulberry32(101);
+      for (let i = 0; i < 4000; i++) {
+        const x = rand() * w;
+        const y = rand() * h;
+        const ang = (rand() - 0.5) * 1.4 + Math.PI * 0.5;
+        const len = 10 + rand() * 22;
+        const shade = rand();
+        ctx.strokeStyle =
+          shade < 0.45 ? "#041608" : shade < 0.8 ? "#0c3b17" : "#185c24";
+        ctx.lineWidth = 1.2 + rand() * 1.6;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        ctx.stroke();
+
+        bctx.strokeStyle = shade < 0.5 ? "#222222" : "#bbbbbb";
+        bctx.lineWidth = 1.5;
+        bctx.beginPath();
+        bctx.moveTo(x, y);
+        bctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+        bctx.stroke();
+      }
+
+      const map = new THREE.CanvasTexture(cCanvas);
+      map.wrapS = THREE.RepeatWrapping;
+      map.wrapT = THREE.RepeatWrapping;
+      map.repeat.set(5, 4);
+      map.colorSpace = THREE.SRGBColorSpace;
+
+      const bumpMap = new THREE.CanvasTexture(bCanvas);
+      bumpMap.wrapS = THREE.RepeatWrapping;
+      bumpMap.wrapT = THREE.RepeatWrapping;
+      bumpMap.repeat.set(5, 4);
+
+      return { map, bumpMap };
+    }
+
+    function createPineSprigTexture() {
+      const s = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = s;
+      canvas.height = s;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, s, s);
+
+      const rand = mulberry32(2025);
+
+      ctx.strokeStyle = "#0b2e13";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.5, s * 0.96);
+      ctx.lineTo(s * 0.5, s * 0.16);
+      ctx.stroke();
+
+      for (let i = 0; i < 150; i++) {
+        const t = i / 150;
+        const stemY = s * (0.94 - t * 0.78);
+        const side = i % 2 === 0 ? -1 : 1;
+        const spread = (0.35 + (1 - t) * 0.65) * (0.65 + rand() * 0.45);
+        const angle = -Math.PI / 2 + side * (0.45 + rand() * 0.75);
+        const len = (36 + (1 - t * 0.45) * 62) * spread;
+
+        const ex = s * 0.5 + Math.cos(angle) * len;
+        const ey = stemY + Math.sin(angle) * len;
+
+        const g = ctx.createLinearGradient(s * 0.5, stemY, ex, ey);
+        const tipPalette = rand();
+        g.addColorStop(0, "#051b0b");
+        g.addColorStop(0.55, tipPalette < 0.5 ? "#0b4218" : "#125821");
+        g.addColorStop(1, tipPalette < 0.35 ? "#1b782c" : "#279137");
+
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 2.6 + rand() * 1.6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(s * 0.5, stemY);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 18; i++) {
+        const angle = -Math.PI / 2 + (rand() - 0.5) * 0.9;
+        const len = 28 + rand() * 26;
+        ctx.strokeStyle = rand() < 0.5 ? "#166826" : "#2b9c3d";
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.5, s * 0.18);
+        ctx.lineTo(s * 0.5 + Math.cos(angle) * len, s * 0.18 + Math.sin(angle) * len);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createCrossedSprigGeometry(width, height) {
+      const p1 = new THREE.PlaneGeometry(width, height);
+      p1.translate(0, height * 0.48, 0);
+
+      const p2 = p1.clone();
+      p2.rotateY(Math.PI * 0.38);
+
+      const p3 = p1.clone();
+      p3.rotateY(-Math.PI * 0.38);
+
+      const geos = [p1, p2, p3];
+      const posArr = [];
+      const normArr = [];
+      const uvArr = [];
+      const idxArr = [];
+      let vOffset = 0;
+
+      for (const g of geos) {
+        const pos = g.attributes.position.array;
+        const norm = g.attributes.normal.array;
+        const uv = g.attributes.uv.array;
+        const idx = g.index.array;
+        for (let i = 0; i < pos.length; i++) posArr.push(pos[i]);
+        for (let i = 0; i < norm.length; i++) normArr.push(norm[i]);
+        for (let i = 0; i < uv.length; i++) uvArr.push(uv[i]);
+        for (let i = 0; i < idx.length; i++) idxArr.push(idx[i] + vOffset);
+        vOffset += g.attributes.position.count;
+      }
+
+      const merged = new THREE.BufferGeometry();
+      merged.setAttribute("position", new THREE.Float32BufferAttribute(posArr, 3));
+      merged.setAttribute("normal", new THREE.Float32BufferAttribute(normArr, 3));
+      merged.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
+      merged.setIndex(idxArr);
+      return merged;
+    }
+
+    function buildChristmasTree() {
+      const treeGroup = new THREE.Group();
+      const rand = mulberry32(4242);
+
+      // 1. Inner textured dark-green conical core
+      const { map: coreMap, bumpMap: coreBump } = createPineCoreTextures();
+      const coreGeo = new THREE.CylinderGeometry(0.07, treeBaseR * 0.72, treeConeH * 0.96, 22);
+      const coreMat = new THREE.MeshStandardMaterial({
+        map: coreMap,
+        bumpMap: coreBump,
+        bumpScale: 0.028,
+        roughness: 0.78,
+        metalness: 0.04
+      });
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      coreMesh.position.y = (treeConeH * 0.96) / 2;
+      coreMesh.castShadow = true;
+      coreMesh.receiveShadow = true;
+      treeGroup.add(coreMesh);
+
+      // 2. Dense instanced 3D pine-needle sprigs
+      const sprigTex = createPineSprigTexture();
+      const sprigGeo = createCrossedSprigGeometry(0.42, 0.46);
+      const sprigMat = new THREE.MeshStandardMaterial({
+        map: sprigTex,
+        alphaTest: 0.38,
+        side: THREE.DoubleSide,
+        roughness: 0.58,
+        metalness: 0.08
+      });
+
+      const sprigTransforms = [];
+      const tiers = 24;
+      for (let t = 0; t < tiers; t++) {
+        const frac = t / (tiers - 1);
+        const y = 0.08 + frac * (treeConeH - 0.16);
+        const tierR = treeBaseR * 0.78 * (1 - frac * 0.88);
+        const count = Math.max(8, Math.round(74 * (1 - frac * 0.80)));
+
+        for (let i = 0; i < count; i++) {
+          const theta = (i / count) * Math.PI * 2 + (rand() - 0.5) * 0.35 + t * 0.41;
+          const r = tierR * (0.72 + rand() * 0.34);
+          const py = y + (rand() - 0.5) * 0.11;
+          const px = Math.cos(theta) * r;
+          const pz = Math.sin(theta) * r;
+
+          const outDir = new THREE.Vector3(
+            Math.cos(theta),
+            0.35 + frac * 0.75 + (rand() - 0.5) * 0.45,
+            Math.sin(theta)
+          ).normalize();
+
+          const scale = (1.14 - frac * 0.46) * (0.82 + rand() * 0.36);
+          sprigTransforms.push({ px, py, pz, outDir, scale, roll: rand() * Math.PI * 2 });
+        }
+      }
+
+      const sprigInst = new THREE.InstancedMesh(sprigGeo, sprigMat, sprigTransforms.length);
+      sprigInst.castShadow = true;
+      sprigInst.receiveShadow = true;
+
+      const sDummy = new THREE.Object3D();
+      const yAxis = new THREE.Vector3(0, 1, 0);
+      const qAlign = new THREE.Quaternion();
+      const qRoll = new THREE.Quaternion();
+
+      for (let i = 0; i < sprigTransforms.length; i++) {
+        const st = sprigTransforms[i];
+        sDummy.position.set(st.px, st.py, st.pz);
+        qAlign.setFromUnitVectors(yAxis, st.outDir);
+        qRoll.setFromAxisAngle(yAxis, st.roll);
+        sDummy.quaternion.copy(qAlign).multiply(qRoll);
+        sDummy.scale.setScalar(st.scale);
+        sDummy.updateMatrix();
+        sprigInst.setMatrixAt(i, sDummy.matrix);
+      }
+      sprigInst.instanceMatrix.needsUpdate = true;
+      treeGroup.add(sprigInst);
+
+      // 3. Spiral metallic wire with tiny LED beads
+      const wirePts = [];
+      const turns = 7.5;
+      const wireSteps = 180;
+      for (let i = 0; i <= wireSteps; i++) {
+        const frac = i / wireSteps;
+        const wy = 0.12 + frac * (treeConeH - 0.26);
+        const wr = treeBaseR * 0.90 * (1 - frac * 0.86);
+        const ang = frac * turns * Math.PI * 2;
+        wirePts.push(new THREE.Vector3(Math.cos(ang) * wr, wy, Math.sin(ang) * wr));
+      }
+      const wireCurve = new THREE.CatmullRomCurve3(wirePts);
+      const wireGeo = new THREE.TubeGeometry(wireCurve, 180, 0.0048, 5, false);
+      const wireMat = new THREE.MeshStandardMaterial({
+        color: 0xb8c0c8,
+        metalness: 0.75,
+        roughness: 0.32
+      });
+      const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+      treeGroup.add(wireMesh);
+
+      const ledCount = 56;
+      const ledGeo = new THREE.SphereGeometry(0.013, 8, 8);
+      const ledMat = new THREE.MeshStandardMaterial({
+        color: 0xfff5d6,
+        emissive: 0xffdf99,
+        emissiveIntensity: 0.8,
+        roughness: 0.2
+      });
+      const ledInst = new THREE.InstancedMesh(ledGeo, ledMat, ledCount);
+      for (let i = 0; i < ledCount; i++) {
+        const pt = wireCurve.getPointAt((i + 0.5) / ledCount);
+        sDummy.position.copy(pt);
+        sDummy.quaternion.identity();
+        sDummy.scale.setScalar(1);
+        sDummy.updateMatrix();
+        ledInst.setMatrixAt(i, sDummy.matrix);
+      }
+      ledInst.instanceMatrix.needsUpdate = true;
+      treeGroup.add(ledInst);
+
+      // 4. Scattered glossy red spherical ornaments
+      const ornGeo = new THREE.SphereGeometry(0.044, 14, 14);
+      const ornMat = new THREE.MeshStandardMaterial({
+        color: 0xc91020,
+        roughness: 0.18,
+        metalness: 0.35
+      });
+      const ornCount = 26;
+      const ornInst = new THREE.InstancedMesh(ornGeo, ornMat, ornCount);
+      ornInst.castShadow = true;
+      for (let i = 0; i < ornCount; i++) {
+        const frac = 0.10 + (i / ornCount) * 0.78;
+        const oy = frac * treeConeH;
+        const or = treeBaseR * 0.87 * (1 - frac * 0.85);
+        const ang = i * 2.39996 + 0.5;
+        sDummy.position.set(Math.cos(ang) * or, oy, Math.sin(ang) * or);
+        sDummy.quaternion.identity();
+        sDummy.scale.setScalar(0.85 + rand() * 0.3);
+        sDummy.updateMatrix();
+        ornInst.setMatrixAt(i, sDummy.matrix);
+      }
+      ornInst.instanceMatrix.needsUpdate = true;
+      treeGroup.add(ornInst);
+
+      // 5. Distinctive 5-Pointed White Star Backing + Red Berry Bead Cluster Topper
+      const starGroup = new THREE.Group();
+      const starY = treeConeH + 0.24;
+      starGroup.position.set(0, starY, 0);
+
+      const rodMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, 0.54, 10),
+        new THREE.MeshStandardMaterial({ color: 0xeceef0, roughness: 0.45 })
+      );
+      rodMesh.position.set(0, -0.15, -0.020);
+      starGroup.add(rodMesh);
+
+      const starOuterR = 0.34;
+      const starInnerR = 0.145;
+      const starPoly = [];
+      const starShape = new THREE.Shape();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? starOuterR : starInnerR;
+        const ang = Math.PI / 2 + (i * Math.PI) / 5;
+        const sx = Math.cos(ang) * r;
+        const sy = Math.sin(ang) * r;
+        starPoly.push([sx, sy]);
+        if (i === 0) starShape.moveTo(sx, sy);
+        else starShape.lineTo(sx, sy);
+      }
+      starShape.closePath();
+
+      const starGeo = new THREE.ExtrudeGeometry(starShape, {
+        depth: 0.026,
+        bevelEnabled: true,
+        bevelThickness: 0.004,
+        bevelSize: 0.004,
+        bevelSegments: 2
+      });
+      starGeo.translate(0, 0, -0.013);
+
+      const starPlateMat = new THREE.MeshStandardMaterial({
+        color: 0xeef0f2,
+        roughness: 0.42,
+        metalness: 0.05
+      });
+      const starPlate = new THREE.Mesh(starGeo, starPlateMat);
+      starPlate.castShadow = true;
+      starGroup.add(starPlate);
+
+      function pointInStar(px, py) {
+        let inside = false;
+        for (let i = 0, j = starPoly.length - 1; i < starPoly.length; j = i++) {
+          const xi = starPoly[i][0], yi = starPoly[i][1];
+          const xj = starPoly[j][0], yj = starPoly[j][1];
+          const intersect =
+            yi > py !== yj > py &&
+            px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-9) + xi;
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      }
+
+      const beadPositions = [];
+      const beadMinDist = 0.048;
+      for (let attempt = 0; attempt < 2200 && beadPositions.length < 84; attempt++) {
+        const bx = (rand() * 2 - 1) * starOuterR;
+        const by = (rand() * 2 - 1) * starOuterR;
+        if (!pointInStar(bx, by)) continue;
+
+        let ok = true;
+        for (const bp of beadPositions) {
+          if (Math.hypot(bx - bp[0], by - bp[1]) < beadMinDist) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) beadPositions.push([bx, by]);
+      }
+      for (let arm = 0; arm < 5; arm++) {
+        const ang = Math.PI / 2 + (arm * 2 * Math.PI) / 5;
+        const tx = Math.cos(ang) * (starOuterR - 0.032);
+        const ty = Math.sin(ang) * (starOuterR - 0.032);
+        let near = false;
+        for (const bp of beadPositions) {
+          if (Math.hypot(tx - bp[0], ty - bp[1]) < 0.038) {
+            near = true;
+            break;
+          }
+        }
+        if (!near) beadPositions.push([tx, ty]);
+      }
+
+      const beadGeo = new THREE.SphereGeometry(0.028, 12, 12);
+      const beadMat = new THREE.MeshStandardMaterial({
+        color: 0xc91222,
+        roughness: 0.16,
+        metalness: 0.35
+      });
+      const beadInst = new THREE.InstancedMesh(beadGeo, beadMat, beadPositions.length);
+      beadInst.castShadow = true;
+      for (let i = 0; i < beadPositions.length; i++) {
+        sDummy.position.set(
+          beadPositions[i][0],
+          beadPositions[i][1],
+          0.026 + rand() * 0.008
+        );
+        sDummy.quaternion.identity();
+        sDummy.scale.setScalar(0.88 + rand() * 0.24);
+        sDummy.updateMatrix();
+        beadInst.setMatrixAt(i, sDummy.matrix);
+      }
+      beadInst.instanceMatrix.needsUpdate = true;
+      starGroup.add(beadInst);
+
+      treeGroup.add(starGroup);
+
+      // 6. Small light-grey battery pack at the bottom-right base
+      const batGroup = new THREE.Group();
+      batGroup.position.set(0.58, 0.052, 0.38);
+      batGroup.rotation.y = -0.35;
+
+      const batBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.20, 0.104, 0.135),
+        new THREE.MeshStandardMaterial({ color: 0xcfd4da, roughness: 0.5, metalness: 0.08 })
+      );
+      batBody.castShadow = true;
+      batBody.receiveShadow = true;
+      batGroup.add(batBody);
+
+      const batSwitch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.030, 0.030, 0.018),
+        new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5 })
+      );
+      batSwitch.position.set(0, 0.007, 0.07);
+      batGroup.add(batSwitch);
+
+      treeGroup.add(batGroup);
+
+      return treeGroup;
+    }
+
+    const christmasTree = buildChristmasTree();
+    christmasTree.position.set(treeX, 0, treeZ);
+    christmasTree.rotation.y = Math.PI + 0.38;
+    roomGroup.add(christmasTree);
+
     // -------------------------------------------------------------------------
     // B. BACK WALL (Z = -6.0m): 3x2 WINDOW & 2 EXHAUST FANS
     // -------------------------------------------------------------------------
@@ -1009,7 +1787,7 @@
     applyCutawayAppearance();
 
     // =========================================================================
-    // 4. 3D EULERIAN MAC-GRID AIRFLOW SOLVER (36 x 11 x 40)
+    // 5. 3D EULERIAN MAC-GRID AIRFLOW SOLVER (36 x 11 x 40)
     // =========================================================================
     const NX = 36;
     const NY = 11;
@@ -1038,6 +1816,52 @@
     const fan2GridX = (fanRightCenterX + ROOM_W / 2) / dx;
     const fanGridY = fanCenterY / dy;
     const fanRadiusCells = 1.5;
+
+    // Grid bounds for the Apple Box & Christmas Tree solid obstacles
+    const boxGridMinX = boardsMinX + ROOM_W / 2;
+    const boxGridMaxX = boardsMaxX + ROOM_W / 2;
+    const boxGridMaxY = appleBoxH;
+    const boxGridMinZ = ROOM_D - appleBoxD;
+
+    const boxMinI = Math.floor(boxGridMinX / dx);
+    const boxMaxI = Math.min(NX - 1, Math.floor(boxGridMaxX / dx));
+    const boxMaxJ = Math.max(0, Math.round(boxGridMaxY / dy) - 1);
+    const boxMinK = Math.floor(boxGridMinZ / dz);
+
+    const treeGridX = treeX + ROOM_W / 2;
+    const treeGridZ = treeZ + ROOM_D / 2;
+
+    function isInsideTreePoint(x, y, z) {
+      if (y > treeConeH) return false;
+      const rAtY = treeBaseR * 0.85 * (1 - (y / treeConeH) * 0.85);
+      return Math.hypot(x - treeGridX, z - treeGridZ) <= rAtY;
+    }
+
+    function isInsideObstaclePoint(x, y, z) {
+      const inBox =
+        x >= boxGridMinX &&
+        x <= boxGridMaxX &&
+        y <= boxGridMaxY &&
+        z >= boxGridMinZ;
+      return inBox || isInsideTreePoint(x, y, z);
+    }
+
+    const solidGrid = new Uint8Array(NX * NY * NZ);
+    for (let k = 0; k < NZ; k++) {
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const inBox = j <= boxMaxJ && i >= boxMinI && i <= boxMaxI && k >= boxMinK;
+          const cx = (i + 0.5) * dx;
+          const cy = (j + 0.5) * dy;
+          const cz = (k + 0.5) * dz;
+          if (inBox || isInsideTreePoint(cx, cy, cz)) {
+            solidGrid[idxP(i, j, k)] = 1;
+          }
+        }
+      }
+    }
+
+    const isSolidCell = (i, j, k) => solidGrid[idxP(i, j, k)] === 1;
 
     function isFanFace(i, j) {
       const d1 = Math.hypot(i + 0.5 - fan1GridX, j + 0.5 - fanGridY);
@@ -1107,6 +1931,22 @@
           const leakOpen = !state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j);
           if (!doorOpen && !leakOpen) {
             w[idxW(i, j, NZ)] = 0;
+          }
+        }
+      }
+
+      // Zero velocities on all faces of solid interior obstacles (Apple Box & Tree)
+      for (let k = 0; k < NZ; k++) {
+        for (let j = 0; j < NY; j++) {
+          for (let i = 0; i < NX; i++) {
+            if (isSolidCell(i, j, k)) {
+              u[idxU(i, j, k)] = 0;
+              u[idxU(i + 1, j, k)] = 0;
+              v[idxV(i, j, k)] = 0;
+              v[idxV(i, j + 1, k)] = 0;
+              w[idxW(i, j, k)] = 0;
+              w[idxW(i, j, k + 1)] = 0;
+            }
           }
         }
       }
@@ -1249,6 +2089,11 @@
       for (let k = 0; k < NZ; k++) {
         for (let j = 0; j < NY; j++) {
           for (let i = 0; i < NX; i++) {
+            if (isSolidCell(i, j, k)) {
+              div[idxP(i, j, k)] = 0;
+              p[idxP(i, j, k)] = 0;
+              continue;
+            }
             div[idxP(i, j, k)] =
               (u[idxU(i + 1, j, k)] - u[idxU(i, j, k)]) / dx +
               (v[idxV(i, j + 1, k)] - v[idxV(i, j, k)]) / dy +
@@ -1261,37 +2106,43 @@
         for (let k = 0; k < NZ; k++) {
           for (let j = 0; j < NY; j++) {
             for (let i = 0; i < NX; i++) {
+              if (isSolidCell(i, j, k)) continue;
+
               let pSum = 0;
               let count = 0;
 
               if (i > 0) {
-                pSum += p[idxP(i - 1, j, k)];
-                count++;
+                if (!isSolidCell(i - 1, j, k)) {
+                  pSum += p[idxP(i - 1, j, k)];
+                  count++;
+                }
               } else if (state.rightWindowOpen && isRightWindowCell(j, k)) {
                 count++;
               }
 
-              if (i < NX - 1) {
+              if (i < NX - 1 && !isSolidCell(i + 1, j, k)) {
                 pSum += p[idxP(i + 1, j, k)];
                 count++;
               }
 
-              if (j > 0) {
+              if (j > 0 && !isSolidCell(i, j - 1, k)) {
                 pSum += p[idxP(i, j - 1, k)];
                 count++;
               }
-              if (j < NY - 1) {
+              if (j < NY - 1 && !isSolidCell(i, j + 1, k)) {
                 pSum += p[idxP(i, j + 1, k)];
                 count++;
               }
 
-              if (k > 0) {
+              if (k > 0 && !isSolidCell(i, j, k - 1)) {
                 pSum += p[idxP(i, j, k - 1)];
                 count++;
               }
               if (k < NZ - 1) {
-                pSum += p[idxP(i, j, k + 1)];
-                count++;
+                if (!isSolidCell(i, j, k + 1)) {
+                  pSum += p[idxP(i, j, k + 1)];
+                  count++;
+                }
               } else if (
                 (state.doorOpen && isFrontDoorCell(i, j)) ||
                 (!state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
@@ -1310,7 +2161,9 @@
       for (let k = 0; k < NZ; k++) {
         for (let j = 0; j < NY; j++) {
           for (let i = 1; i < NX; i++) {
-            u[idxU(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i - 1, j, k)]) / dx;
+            if (!isSolidCell(i, j, k) && !isSolidCell(i - 1, j, k)) {
+              u[idxU(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i - 1, j, k)]) / dx;
+            }
           }
           if (state.rightWindowOpen && isRightWindowCell(j, k)) {
             u[idxU(0, j, k)] -= (p[idxP(0, j, k)] - 0) / dx;
@@ -1321,7 +2174,9 @@
       for (let k = 0; k < NZ; k++) {
         for (let j = 1; j < NY; j++) {
           for (let i = 0; i < NX; i++) {
-            v[idxV(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j - 1, k)]) / dy;
+            if (!isSolidCell(i, j, k) && !isSolidCell(i, j - 1, k)) {
+              v[idxV(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j - 1, k)]) / dy;
+            }
           }
         }
       }
@@ -1329,7 +2184,9 @@
       for (let k = 1; k < NZ; k++) {
         for (let j = 0; j < NY; j++) {
           for (let i = 0; i < NX; i++) {
-            w[idxW(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j, k - 1)]) / dz;
+            if (!isSolidCell(i, j, k) && !isSolidCell(i, j, k - 1)) {
+              w[idxW(i, j, k)] -= (p[idxP(i, j, k)] - p[idxP(i, j, k - 1)]) / dz;
+            }
           }
         }
       }
@@ -1337,8 +2194,9 @@
       for (let j = 0; j < NY; j++) {
         for (let i = 0; i < NX; i++) {
           if (
-            (state.doorOpen && isFrontDoorCell(i, j)) ||
-            (!state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j))
+            !isSolidCell(i, j, NZ - 1) &&
+            ((state.doorOpen && isFrontDoorCell(i, j)) ||
+              (!state.doorOpen && !state.rightWindowOpen && isPassiveLeak(i, j)))
           ) {
             w[idxW(i, j, NZ)] -= (0 - p[idxP(i, j, NZ - 1)]) / dz;
           }
@@ -1356,7 +2214,7 @@
     }
 
     // =========================================================================
-    // 5. AIRFLOW STREAMLINES & VELOCITY VECTOR GRID
+    // 6. AIRFLOW STREAMLINES & VELOCITY VECTOR GRID
     // =========================================================================
     const PARTICLE_COUNT = 2800;
     const pPos = new Float32Array(PARTICLE_COUNT * 3);
@@ -1405,6 +2263,9 @@
         x = Math.random() * ROOM_W;
         y = 0.1 + Math.random() * (ROOM_H - 0.2);
         z = Math.random() * ROOM_D;
+        if (isInsideObstaclePoint(x, y, z)) {
+          y = treeConeH + 0.15 + Math.random() * (ROOM_H - treeConeH - 0.3);
+        }
       } else {
         const leftIn = state.leftFan.dir > 0 && state.leftFan.speed > 0.1;
         const rightIn = state.rightFan.dir > 0 && state.rightFan.speed > 0.1;
@@ -1429,6 +2290,9 @@
           x = 0.15 + Math.random() * (ROOM_W - 0.3);
           y = 0.15 + Math.random() * (ROOM_H - 0.3);
           z = 0.15 + Math.random() * (ROOM_D - 0.3);
+          if (isInsideObstaclePoint(x, y, z)) {
+            y = treeConeH + 0.15 + Math.random() * (ROOM_H - treeConeH - 0.3);
+          }
         }
       }
 
@@ -1465,7 +2329,8 @@
           pAge[i] > pMaxAge[i] ||
           x < 0.02 || x > ROOM_W - 0.02 ||
           y < 0.02 || y > ROOM_H - 0.02 ||
-          z < 0.02 || z > ROOM_D - 0.02
+          z < 0.02 || z > ROOM_D - 0.02 ||
+          isInsideObstaclePoint(x, y, z)
         ) {
           spawnParticle(i, false);
           x = pPos[i * 3];
@@ -1513,11 +2378,12 @@
     for (let i = 2; i < NX; i += 4) {
       for (let j = 1; j < NY; j += 2) {
         for (let k = 2; k < NZ; k += 4) {
-          arrowPoints.push([
-            (i + 0.5) * dx,
-            (j + 0.5) * dy,
-            (k + 0.5) * dz
-          ]);
+          const px = (i + 0.5) * dx;
+          const py = (j + 0.5) * dy;
+          const pz = (k + 0.5) * dz;
+          if (!isInsideObstaclePoint(px, py, pz)) {
+            arrowPoints.push([px, py, pz]);
+          }
         }
       }
     }
@@ -1563,7 +2429,7 @@
     }
 
     // =========================================================================
-    // 6. UI BINDINGS & CAMERA PRESETS
+    // 7. UI BINDINGS & CAMERA PRESETS
     // =========================================================================
     const elLeftSpeed = document.getElementById("left-speed");
     const elRightSpeed = document.getElementById("right-speed");
@@ -1690,7 +2556,7 @@
     };
 
     // =========================================================================
-    // 7. ANIMATION LOOP & TELEMETRY
+    // 8. ANIMATION LOOP & TELEMETRY
     // =========================================================================
     const elFlow = document.getElementById("stat-flow");
     const elAch = document.getElementById("stat-ach");
@@ -1708,7 +2574,8 @@
       const restriction = hasIntake ? 1.0 : 0.14;
       const totalM3h = (qLeft + qRight) * restriction;
 
-      const roomVol = ROOM_W * ROOM_H * ROOM_D; // 427.7 m³
+      const treeVol = (1 / 3) * Math.PI * treeBaseR * treeBaseR * treeConeH;
+      const roomVol = ROOM_W * ROOM_H * ROOM_D - appleBoxW * appleBoxH * appleBoxD - treeVol;
       const ach = totalM3h / roomVol;
 
       let sumSpeed = 0;
@@ -1716,6 +2583,7 @@
       for (let k = 1; k < NZ - 1; k += 2) {
         for (let j = 1; j < NY - 1; j += 2) {
           for (let i = 1; i < NX - 1; i += 2) {
+            if (isSolidCell(i, j, k)) continue;
             const vx = 0.5 * (u[idxU(i, j, k)] + u[idxU(i + 1, j, k)]);
             const vy = 0.5 * (v[idxV(i, j, k)] + v[idxV(i, j + 1, k)]);
             const vz = 0.5 * (w[idxW(i, j, k)] + w[idxW(i, j, k + 1)]);

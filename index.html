@@ -967,9 +967,10 @@
         frontWall.position.z = ROOM_D / 2 + WALL_T / 2;
         roomGroup.add(frontWall);
 
-        function createDoorAssembly(cx, hingeSide) {
+        function createDoorAssembly(x, z, rotY, hingeSide, leafLocalZ = -WALL_T / 2) {
             const doorContainer = new THREE.Group();
-            doorContainer.position.set(cx, 0, ROOM_D / 2 + WALL_T / 2);
+            doorContainer.position.set(x, 0, z);
+            doorContainer.rotation.y = rotY;
 
             const jambT = 0.05;
             const dFrameMat = new THREE.MeshStandardMaterial({ color: 0x3b3530, roughness: 0.6 });
@@ -984,7 +985,7 @@
             const leafW = doorW - jambT * 2;
             const leafH = doorH - jambT;
             const leafPivot = new THREE.Group();
-            leafPivot.position.set(hingeSide * (leafW / 2), 0, -WALL_T / 2);
+            leafPivot.position.set(hingeSide * (leafW / 2), 0, leafLocalZ);
 
             const leafMat = new THREE.MeshStandardMaterial({ color: 0xa67c52, roughness: 0.62 });
             const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafW, leafH, 0.045), leafMat);
@@ -1003,7 +1004,7 @@
             return leafPivot;
         }
 
-        const rightDoorPivot = createDoorAssembly(doorRightX, -1);
+        const rightDoorPivot = createDoorAssembly(doorRightX, ROOM_D / 2 + WALL_T / 2, 0, -1, -WALL_T / 2);
 
         const frontBoardZ = ROOM_D / 2 - 0.025;
         const boardCenterY = 1.55;
@@ -1946,22 +1947,34 @@
         const rightFanMesh = createFanUnit(fanRightCenterX, fanCenterY, 0);
 
         // -------------------------------------------------------------------------
-        // C. SIDE WALLS
+        // C. SIDE WALLS (Right wall with adjusted 70% window + fixed decorative door)
         // -------------------------------------------------------------------------
         const rightWinW = ROOM_D * 0.70;
         const rightWinH = 2.25;
         const rightWinSillY = 0.85;
         const rightWinCenterY = rightWinSillY + rightWinH / 2;
+        const rightWinCx = -0.55;  // shifted toward front wall (+Z) to leave room for right-side door
+        const rightDoorCx = 5.15;  // placed on right side of right wall (0.35m from back-wall corner)
 
         const rightWall = buildWallWithOpenings(ROOM_D, ROOM_H, [
-            { cx: 0, cy: rightWinCenterY, ow: rightWinW, oh: rightWinH }
+            { cx: rightWinCx, cy: rightWinCenterY, ow: rightWinW, oh: rightWinH },
+            { cx: rightDoorCx, cy: doorH / 2, ow: doorW, oh: doorH }
         ]);
         rightWall.rotation.y = Math.PI / 2;
         rightWall.position.x = -ROOM_W / 2 - WALL_T / 2;
         roomGroup.add(rightWall);
 
+        // Decorative permanently closed door on the right side of the right wall
+        createDoorAssembly(
+            -ROOM_W / 2 - WALL_T / 2,
+            -rightDoorCx,
+            Math.PI / 2,
+            1,
+            WALL_T / 2 - 0.025
+        );
+
         const rightWinGroup = new THREE.Group();
-        rightWinGroup.position.set(-ROOM_W / 2 - WALL_T / 2, rightWinCenterY, 0);
+        rightWinGroup.position.set(-ROOM_W / 2 - WALL_T / 2, rightWinCenterY, -rightWinCx);
         rightWinGroup.rotation.y = Math.PI / 2;
         roomGroup.add(rightWinGroup);
 
@@ -2002,6 +2015,325 @@
             blankLeftWallMesh.castShadow = !state.cutaway;
         }
         applyCutawayAppearance();
+
+        // -------------------------------------------------------------------------
+        // D. CLASSROOM TABLET ARMCHAIRS (7 ROWS x 9 COLUMNS = 63 CHAIRS)
+        // -------------------------------------------------------------------------
+        function createChairWoodTextures() {
+            const w = 512;
+            const h = 512;
+            const cCanvas = document.createElement("canvas");
+            cCanvas.width = w;
+            cCanvas.height = h;
+            const ctx = cCanvas.getContext("2d");
+
+            const bCanvas = document.createElement("canvas");
+            bCanvas.width = w;
+            bCanvas.height = h;
+            const bctx = bCanvas.getContext("2d");
+
+            const rand = mulberry32(9071);
+
+            const bg = ctx.createLinearGradient(0, 0, w, h);
+            bg.addColorStop(0, "#8c6443");
+            bg.addColorStop(0.5, "#7d5738");
+            bg.addColorStop(1, "#876040");
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, w, h);
+
+            bctx.fillStyle = "#808080";
+            bctx.fillRect(0, 0, w, h);
+
+            for (let i = 0; i < 360; i++) {
+                const gy = rand() * h;
+                const amp = 1.2 + rand() * 3.8;
+                const freq = (1 + Math.floor(rand() * 3)) * Math.PI * 2;
+                const dark = rand() < 0.65;
+                ctx.strokeStyle = dark
+                    ? `rgba(54, 34, 18, ${0.12 + rand() * 0.20})`
+                    : `rgba(176, 132, 92, ${0.08 + rand() * 0.14})`;
+                ctx.lineWidth = 0.7 + rand() * 2.0;
+                ctx.beginPath();
+                for (let s = 0; s <= 18; s++) {
+                    const t = s / 18;
+                    const wx = t * w;
+                    const wy = gy + Math.sin(t * freq + i) * amp;
+                    if (s === 0) ctx.moveTo(wx, wy);
+                    else ctx.lineTo(wx, wy);
+                }
+                ctx.stroke();
+
+                bctx.strokeStyle = dark ? "rgba(92,92,92,0.3)" : "rgba(164,164,164,0.24)";
+                bctx.lineWidth = 1.0 + rand() * 1.4;
+                bctx.beginPath();
+                bctx.moveTo(0, gy);
+                bctx.lineTo(w, gy);
+                bctx.stroke();
+            }
+
+            const map = new THREE.CanvasTexture(cCanvas);
+            map.wrapS = THREE.RepeatWrapping;
+            map.wrapT = THREE.RepeatWrapping;
+            map.colorSpace = THREE.SRGBColorSpace;
+            map.anisotropy = 4;
+
+            const bumpMap = new THREE.CanvasTexture(bCanvas);
+            bumpMap.wrapS = THREE.RepeatWrapping;
+            bumpMap.wrapT = THREE.RepeatWrapping;
+            bumpMap.anisotropy = 4;
+
+            return { map, bumpMap };
+        }
+
+        function mergeNonIndexedGeometries(geos) {
+            let totalVerts = 0;
+            const nonIdx = geos.map((g) => {
+                const ng = g.index ? g.toNonIndexed() : g;
+                if (!ng.attributes.normal) ng.computeVertexNormals();
+                totalVerts += ng.attributes.position.count;
+                return ng;
+            });
+
+            const pos = new Float32Array(totalVerts * 3);
+            const norm = new Float32Array(totalVerts * 3);
+            const uv = new Float32Array(totalVerts * 2);
+
+            let offset = 0;
+            for (const ng of nonIdx) {
+                const count = ng.attributes.position.count;
+                pos.set(ng.attributes.position.array, offset * 3);
+                norm.set(ng.attributes.normal.array, offset * 3);
+                if (ng.attributes.uv) {
+                    uv.set(ng.attributes.uv.array, offset * 2);
+                }
+                offset += count;
+            }
+
+            const merged = new THREE.BufferGeometry();
+            merged.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+            merged.setAttribute("normal", new THREE.BufferAttribute(norm, 3));
+            merged.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+            return merged;
+        }
+
+        function createRoundedRectShape(w, h, r) {
+            const hw = w / 2;
+            const hh = h / 2;
+            const s = new THREE.Shape();
+            s.moveTo(-hw + r, -hh);
+            s.lineTo(hw - r, -hh);
+            s.quadraticCurveTo(hw, -hh, hw, -hh + r);
+            s.lineTo(hw, hh - r);
+            s.quadraticCurveTo(hw, hh, hw - r, hh);
+            s.lineTo(-hw + r, hh);
+            s.quadraticCurveTo(-hw, hh, -hw, hh - r);
+            s.lineTo(-hw, -hh + r);
+            s.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+            return s;
+        }
+
+        function makeTubeSeg(pA, pB, radius) {
+            const dir = new THREE.Vector3().subVectors(pB, pA);
+            const len = dir.length();
+            const g = new THREE.CylinderGeometry(radius, radius, len, 10, 1);
+            const mid = new THREE.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
+            const q = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir.normalize()
+            );
+            g.applyMatrix4(new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, 1, 1)));
+            return g;
+        }
+
+        function makeJointCap(pt, radius) {
+            const g = new THREE.SphereGeometry(radius, 8, 8);
+            g.translate(pt.x, pt.y, pt.z);
+            return g;
+        }
+
+        function buildClassroomChairs() {
+            const woodT = 0.020;
+            const bevel = 0.003;
+
+            // 1. Seat wood panel (horizontal grain along X)
+            const seatShape = createRoundedRectShape(0.44, 0.41, 0.022);
+            const seatGeo = new THREE.ExtrudeGeometry(seatShape, {
+                depth: woodT,
+                bevelEnabled: true,
+                bevelThickness: bevel,
+                bevelSize: bevel,
+                bevelSegments: 2
+            });
+            seatGeo.rotateX(-Math.PI / 2);
+            seatGeo.translate(0, 0.428, -0.005);
+
+            // 2. Backrest wood panel (horizontal grain along X, reclined ~10 deg backward)
+            const backShape = createRoundedRectShape(0.43, 0.175, 0.016);
+            const backGeo = new THREE.ExtrudeGeometry(backShape, {
+                depth: woodT,
+                bevelEnabled: true,
+                bevelThickness: bevel,
+                bevelSize: bevel,
+                bevelSegments: 2
+            });
+            backGeo.translate(0, 0, -woodT / 2);
+            backGeo.rotateX(-0.175);
+            backGeo.translate(0, 0.715, -0.232);
+
+            // 3. Tablet arm wood panel (right-hand side = -X when facing +Z; grain front-to-back along Z)
+            // Drawn in 2D shape coordinates: shapeX -> worldX, shapeY -> -worldZ after rotateX(-PI/2)
+            const tabShape = new THREE.Shape();
+            tabShape.moveTo(-0.312, 0.215);               // back-outer corner (worldZ = -0.215)
+            tabShape.lineTo(-0.228, 0.215);               // back-inner corner
+            tabShape.quadraticCurveTo(-0.216, 0.215, -0.216, 0.200);
+            tabShape.lineTo(-0.216, -0.030);              // armrest straight inner edge (worldZ = +0.03)
+            tabShape.bezierCurveTo(-0.216, -0.115, -0.072, -0.125, -0.072, -0.225); // S-curve outward to writing pad
+            tabShape.lineTo(-0.072, -0.405);              // front writing pad inner edge (worldZ = +0.405)
+            tabShape.quadraticCurveTo(-0.072, -0.430, -0.097, -0.430);
+            tabShape.lineTo(-0.305, -0.430);              // front edge
+            tabShape.quadraticCurveTo(-0.330, -0.430, -0.330, -0.405);
+            tabShape.lineTo(-0.330, 0.197);               // outer straight edge
+            tabShape.quadraticCurveTo(-0.330, 0.215, -0.312, 0.215);
+
+            const tabGeo = new THREE.ExtrudeGeometry(tabShape, {
+                depth: woodT,
+                bevelEnabled: true,
+                bevelThickness: bevel,
+                bevelSize: bevel,
+                bevelSegments: 2
+            });
+            tabGeo.rotateX(-Math.PI / 2);
+            tabGeo.translate(0, 0.662, 0);
+
+            // Rotate tablet UVs 90 deg so wood grain runs front-to-back (along Z)
+            const tabUV = tabGeo.attributes.uv;
+            for (let i = 0; i < tabUV.count; i++) {
+                const u0 = tabUV.getX(i);
+                const v0 = tabUV.getY(i);
+                tabUV.setXY(i, v0 * 1.6, u0 * 1.6);
+            }
+            for (const g of [seatGeo, backGeo]) {
+                const uvAttr = g.attributes.uv;
+                for (let i = 0; i < uvAttr.count; i++) {
+                    uvAttr.setXY(i, uvAttr.getX(i) * 1.8, uvAttr.getY(i) * 1.8);
+                }
+            }
+
+            const woodGeo = mergeNonIndexedGeometries([seatGeo, backGeo, tabGeo]);
+
+            // 4. Tubular dark steel frame
+            const rMain = 0.0125;
+            const rRack = 0.007;
+            const frameParts = [];
+
+            const addSeg = (a, b, r = rMain, capA = false, capB = false) => {
+                const pA = new THREE.Vector3(...a);
+                const pB = new THREE.Vector3(...b);
+                frameParts.push(makeTubeSeg(pA, pB, r));
+                if (capA) frameParts.push(makeJointCap(pA, r));
+                if (capB) frameParts.push(makeJointCap(pB, r));
+            };
+
+            // Front legs (left +X, right -X)
+            addSeg([0.195, 0.008, 0.18], [0.195, 0.422, 0.18], rMain, true, true);
+            addSeg([-0.195, 0.008, 0.18], [-0.195, 0.422, 0.18], rMain, true, true);
+
+            // Rear legs (splayed backward at bottom) + reclined backrest uprights
+            addSeg([0.195, 0.008, -0.242], [0.195, 0.415, -0.192], rMain, true, true);
+            addSeg([0.195, 0.415, -0.192], [0.195, 0.805, -0.261], rMain, false, true);
+
+            addSeg([-0.195, 0.008, -0.242], [-0.195, 0.415, -0.192], rMain, true, true);
+            addSeg([-0.195, 0.415, -0.192], [-0.195, 0.805, -0.261], rMain, false, true);
+
+            // Under-seat perimeter steel frame
+            addSeg([-0.195, 0.415, 0.18], [0.195, 0.415, 0.18], rMain);
+            addSeg([-0.195, 0.415, -0.192], [0.195, 0.415, -0.192], rMain);
+            addSeg([0.195, 0.415, -0.192], [0.195, 0.415, 0.18], rMain);
+            addSeg([-0.195, 0.415, -0.192], [-0.195, 0.415, 0.18], rMain);
+
+            // Lower book-rack frame at y = 0.16 (rear leg z at y=0.16 is -0.223)
+            addSeg([-0.195, 0.16, 0.18], [0.195, 0.16, 0.18], rMain);
+            addSeg([-0.195, 0.16, -0.223], [0.195, 0.16, -0.223], rMain);
+            addSeg([0.195, 0.16, -0.223], [0.195, 0.16, 0.18], rMain);
+            addSeg([-0.195, 0.16, -0.223], [-0.195, 0.16, 0.18], rMain);
+
+            // Diagonal rear corner braces (visible on side elevations)
+            addSeg([0.195, 0.16, -0.165], [0.195, 0.235, -0.214], rMain * 0.85);
+            addSeg([-0.195, 0.16, -0.165], [-0.195, 0.235, -0.214], rMain * 0.85);
+
+            // 4 longitudinal under-seat book-rack rods
+            for (const rx of [-0.115, -0.038, 0.038, 0.115]) {
+                addSeg([rx, 0.16, -0.223], [rx, 0.16, 0.18], rRack);
+            }
+
+            // Outboard vertical tablet-arm support post (goes down to floor alongside front-right leg)
+            addSeg([-0.248, 0.008, 0.18], [-0.248, 0.654, 0.18], rMain, true, true);
+            // Cross ties welding tablet post to front-right leg at lower rail & under-seat level
+            addSeg([-0.248, 0.16, 0.18], [-0.195, 0.16, 0.18], rMain);
+            addSeg([-0.248, 0.415, 0.18], [-0.195, 0.415, 0.18], rMain);
+
+            // Horizontal tablet-arm support rails underneath the wood tablet
+            addSeg([-0.195, 0.648, -0.233], [-0.248, 0.648, 0.18], rMain, true, true);
+            addSeg([-0.248, 0.648, 0.18], [-0.248, 0.648, 0.345], rMain, false, true);
+            addSeg([-0.248, 0.648, 0.18], [-0.135, 0.648, 0.18], rMain * 0.9, false, true);
+
+            const frameGeo = mergeNonIndexedGeometries(frameParts);
+
+            const { map: chairWoodMap, bumpMap: chairWoodBump } = createChairWoodTextures();
+            const chairWoodMat = new THREE.MeshStandardMaterial({
+                map: chairWoodMap,
+                bumpMap: chairWoodBump,
+                bumpScale: 0.008,
+                roughness: 0.62,
+                metalness: 0.04
+            });
+            const chairFrameMat = new THREE.MeshStandardMaterial({
+                color: 0x202328,
+                roughness: 0.48,
+                metalness: 0.55
+            });
+
+            // 7 rows x 9 columns (3 blocks of 3 columns separated by 1.20m aisles), facing front boards (+Z)
+            const colPositions = [
+                -4.45, -3.55, -2.65,
+                -0.90, 0.00, 0.90,
+                2.65, 3.55, 4.45
+            ];
+            const rowPositions = [-4.75, -3.47, -2.19, -0.91, 0.37, 1.65, 2.93];
+
+            const chairPositions = [];
+            for (const rz of rowPositions) {
+                for (const cx of colPositions) {
+                    chairPositions.push([cx, rz]);
+                }
+            }
+
+            const woodInst = new THREE.InstancedMesh(woodGeo, chairWoodMat, chairPositions.length);
+            woodInst.castShadow = true;
+            woodInst.receiveShadow = true;
+
+            const frameInst = new THREE.InstancedMesh(frameGeo, chairFrameMat, chairPositions.length);
+            frameInst.castShadow = true;
+            frameInst.receiveShadow = true;
+
+            const cDummy = new THREE.Object3D();
+            for (let i = 0; i < chairPositions.length; i++) {
+                const [cx, cz] = chairPositions[i];
+                cDummy.position.set(cx, 0, cz);
+                cDummy.rotation.set(0, 0, 0);
+                cDummy.scale.set(1, 1, 1);
+                cDummy.updateMatrix();
+                woodInst.setMatrixAt(i, cDummy.matrix);
+                frameInst.setMatrixAt(i, cDummy.matrix);
+            }
+            woodInst.instanceMatrix.needsUpdate = true;
+            frameInst.instanceMatrix.needsUpdate = true;
+
+            roomGroup.add(woodInst);
+            roomGroup.add(frameInst);
+        }
+
+        buildClassroomChairs();
 
         // =========================================================================
         // 5. 3D EULERIAN MAC-GRID AIRFLOW SOLVER (36 x 11 x 40)
@@ -2088,7 +2420,7 @@
         }
 
         function isRightWindowCell(j, k) {
-            return j >= 3 && j <= 9 && k >= 6 && k <= 33;
+            return j >= 3 && j <= 9 && k >= 8 && k <= 35;
         }
 
         function isFrontDoorCell(i, j) {
@@ -2499,7 +2831,7 @@
                 } else if (state.rightWindowOpen && r < 0.88) {
                     x = 0.08;
                     y = 0.95 + Math.random() * 2.05;
-                    z = 1.9 + Math.random() * 8.2;
+                    z = 2.45 + Math.random() * 8.2;
                 } else {
                     x = 0.15 + Math.random() * (ROOM_W - 0.3);
                     y = 0.15 + Math.random() * (ROOM_H - 0.3);
